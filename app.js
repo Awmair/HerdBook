@@ -304,9 +304,10 @@
     app.innerHTML = `
       <header class="topbar">
         <div class="brand-mark"><img src="assets/herdbook-open-book-goat-icon-concept.png" alt="HerdBook icon" /></div>
-        <div>
+        <div class="topbar-title">
           <p class="eyebrow">${esc(state.data.meta.farmName || "HerdBook")}</p>
           <h1>${esc(titleForView())}</h1>
+          <p class="topbar-subtitle">${esc(subtitleForView())}</p>
         </div>
         <button class="sync-pill" data-action="goto-sync" type="button">
           <span class="sync-dot ${status}"></span>${label}
@@ -326,6 +327,16 @@
       finance: "Finance",
       sync: "Sync",
     }[state.view] || "HerdBook";
+  }
+
+  function subtitleForView() {
+    return {
+      dashboard: state.data.sync.dirty ? "Unsynced changes on this iPhone" : `Last synced ${lastSyncedText()}`,
+      herd: "Profiles, tags, lineage, and notes",
+      records: "Health, breeding, milk, weights, and tasks",
+      finance: "Purchases, sales, and simple net tracking",
+      sync: "Google Drive backup and restore",
+    }[state.view] || "";
   }
 
   function renderSetup() {
@@ -377,18 +388,18 @@
 
   function renderNav() {
     const items = [
-      ["dashboard", "Today"],
-      ["herd", "Herd"],
-      ["records", "Records"],
-      ["finance", "Money"],
-      ["sync", "Sync"],
+      ["dashboard", "Today", "T"],
+      ["herd", "Herd", "H"],
+      ["records", "Records", "R"],
+      ["finance", "Money", "$"],
+      ["sync", "Sync", "S"],
     ];
     return `
       <nav class="bottom-nav" aria-label="HerdBook sections">
         ${items
           .map(
-            ([id, label]) =>
-              `<button type="button" class="${state.view === id ? "active" : ""}" data-view="${id}">${label}</button>`
+            ([id, label, icon]) =>
+              `<button type="button" class="${state.view === id ? "active" : ""}" data-view="${id}"><span class="nav-icon">${esc(icon)}</span><span>${esc(label)}</span></button>`
           )
           .join("")}
       </nav>
@@ -415,29 +426,38 @@
     const recentExpenses = [...state.data.expenses].sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, 4);
 
     return `
-      <section class="band">
-        <p class="eyebrow">Today</p>
-        <h2>${esc(state.data.meta.farmName)}</h2>
-        <p>${state.data.sync.dirty ? "Local changes are waiting for Save & Sync." : `Last synced ${lastSyncedText()}.`}</p>
+      <section class="dashboard-hero">
+        <div>
+          <p class="eyebrow">Today</p>
+          <h2>${esc(state.data.meta.farmName)}</h2>
+          <p>${state.data.sync.dirty ? "Local changes are waiting for Save & Sync." : `Last synced ${lastSyncedText()}.`}</p>
+        </div>
+        <button class="btn brass small" data-action="goto-sync" type="button">${state.data.sync.dirty ? "Save & Sync" : "Sync"}</button>
       </section>
       <section class="stats-grid">
-        ${stat(activeGoats.length, "Active herd")}
-        ${stat(does.length, "Does")}
-        ${stat(bucks.length, "Bucks")}
-        ${stat(kids.length, "Kids")}
+        ${stat(activeGoats.length, "Active herd", "H")}
+        ${stat(does.length, "Does", "D")}
+        ${stat(bucks.length, "Bucks", "B")}
+        ${stat(kids.length, "Kids", "K")}
       </section>
       <section class="desktop-layout">
         <div>
           <section class="panel">
-            <div class="toolbar">
-              <h2>Due Today</h2>
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Next 14 days</p>
+                <h2>Due Today</h2>
+              </div>
               <button class="btn small" data-form="task" type="button">Add Task</button>
             </div>
             ${renderDueList(dueHealth, dueTasks)}
           </section>
           <section class="panel">
-            <div class="toolbar">
-              <h2>Kidding Soon</h2>
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Next 45 days</p>
+                <h2>Kidding Soon</h2>
+              </div>
               <button class="btn small secondary" data-form="breeding" type="button">Add Breeding</button>
             </div>
             ${renderKiddingSoon(kiddingSoon)}
@@ -445,11 +465,21 @@
         </div>
         <div>
           <section class="panel">
-            <h2>Recent Expenses</h2>
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">Money</p>
+                <h2>Recent Expenses</h2>
+              </div>
+            </div>
             ${recentExpenses.length ? `<div class="list">${recentExpenses.map(renderExpenseItem).join("")}</div>` : empty("No expenses yet.")}
           </section>
           <section class="panel">
-            <h2>Weight Trend</h2>
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">Growth</p>
+                <h2>Weight Trend</h2>
+              </div>
+            </div>
             ${renderMiniWeightChart()}
           </section>
         </div>
@@ -457,8 +487,8 @@
     `;
   }
 
-  function stat(value, label) {
-    return `<div class="stat"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`;
+  function stat(value, label, icon = "") {
+    return `<div class="stat">${icon ? `<span class="stat-icon">${esc(icon)}</span>` : ""}<strong>${esc(value)}</strong><span>${esc(label)}</span></div>`;
   }
 
   function isDueSoon(dateText, days) {
@@ -774,11 +804,11 @@
             <span class="tag ${state.data.sync.dirty ? "warn" : ""}">${esc(lastSyncedText())}</span>
           </div>
           <p class="muted">Edits always save on this iPhone first. Tap Save & Sync and wait for Synced before closing the app.</p>
-          <p class="muted">Load Drive replaces this phone's local copy with the HerdBook file already saved in Google Drive. Use it on a new phone, after clearing Safari data, or when recovering from Drive.</p>
+          <p class="muted">Restore from Drive replaces this phone's local copy with the HerdBook file already saved in Google Drive. Use it on a new phone, after clearing Safari data, or when recovering from Drive.</p>
           <div class="toolbar">
             <button class="btn brass" data-action="save-sync" type="button" ${googleReady ? "" : "disabled"}>Save & Sync</button>
             <button class="btn ${signedIn ? "" : "secondary"}" data-action="google-signin" type="button" ${googleReady && !signedIn ? "" : "disabled"}>${signedIn ? "Signed In" : "Sign In"}</button>
-            <button class="btn secondary" data-action="load-drive" type="button" ${googleReady ? "" : "disabled"}>Load Drive</button>
+            <button class="btn secondary" data-action="load-drive" type="button" ${googleReady ? "" : "disabled"}>Restore from Drive</button>
           </div>
           ${state.drive.message ? `<p>${esc(state.drive.message)}</p>` : ""}
           ${state.drive.error ? `<p class="tag danger">${esc(state.drive.error)}</p>` : ""}
@@ -1329,7 +1359,7 @@
         render();
         return;
       }
-      if (state.data.sync.dirty && !window.confirm("Local changes are unsynced. Load Drive copy anyway?")) {
+      if (state.data.sync.dirty && !window.confirm("Local changes are unsynced. Restore the Drive copy anyway?")) {
         state.drive.busy = false;
         render();
         return;
@@ -1346,9 +1376,9 @@
       state.data = remote;
       await writeStoredFarm(state.data);
       state.drive.busy = false;
-      state.drive.message = "Loaded from Google Drive.";
+      state.drive.message = "Restored from Google Drive.";
       render();
-      toast("Loaded Drive copy.");
+      toast("Restored Drive copy.");
     } catch (error) {
       state.drive.busy = false;
       state.drive.error = error.message;
