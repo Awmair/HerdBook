@@ -43,11 +43,11 @@ For a private one-friend deployment, add the friend's Google email as an OAuth t
 
 ## App Config
 
-Set the browser OAuth client ID in `config.js`:
+The browser OAuth client ID is set in `config.js`:
 
 ```js
 window.HERDBOOK_CONFIG = {
-  googleClientId: "YOUR_BROWSER_CLIENT_ID.apps.googleusercontent.com",
+  googleClientId: "497475714869-qjt64te3hco5pai8ff496df0v5qrj7s0.apps.googleusercontent.com",
   driveFileName: "herdbook-farm.json",
   appUrl: "https://awmair.github.io/HerdBook/",
 };
