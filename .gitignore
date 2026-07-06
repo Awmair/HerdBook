@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.env.*
+*.local
+credentials.json
+client_secret*.json
+service-account*.json
+token.json
+tokens.json
+*.pem
+*.key
+node_modules/
+dist/
+coverage/
+tmp/
+*.log
