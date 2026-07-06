@@ -388,22 +388,35 @@
 
   function renderNav() {
     const items = [
-      ["dashboard", "Today", "T"],
-      ["herd", "Herd", "H"],
-      ["records", "Records", "R"],
-      ["finance", "Finance", "$"],
-      ["sync", "Sync", "S"],
+      ["dashboard", "Today"],
+      ["herd", "Herd"],
+      ["records", "Records"],
+      ["finance", "Finance"],
+      ["sync", "Sync"],
     ];
     return `
       <nav class="bottom-nav" aria-label="HerdBook sections">
         ${items
           .map(
-            ([id, label, icon]) =>
-              `<button type="button" class="${state.view === id ? "active" : ""}" data-view="${id}"><span class="nav-icon">${esc(icon)}</span><span>${esc(label)}</span></button>`
+            ([id, label]) =>
+              `<button type="button" class="${state.view === id ? "active" : ""}" data-view="${id}"><span class="nav-icon">${navIcon(id)}</span><span>${esc(label)}</span></button>`
           )
           .join("")}
       </nav>
     `;
+  }
+
+  function navIcon(id) {
+    const attrs = `class="nav-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"`;
+    const common = `fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"`;
+    const icons = {
+      dashboard: `<svg ${attrs}><rect ${common} x="5" y="5" width="14" height="14" rx="3"></rect><path ${common} d="M8 9h8"></path><path ${common} d="M9 4v3"></path><path ${common} d="M15 4v3"></path><path ${common} d="m9 13 2 2 4-4"></path><circle class="nav-accent" cx="17.2" cy="17" r="1.8"></circle></svg>`,
+      herd: `<svg ${attrs}><path ${common} d="M7.5 10.2c0-3.1 2-5.2 4.5-5.2s4.5 2.1 4.5 5.2v2.6c0 3.2-2 5.2-4.5 5.2s-4.5-2-4.5-5.2z"></path><path ${common} d="M8.3 9.4 4.8 7.8c.1 2.7 1.2 4.4 3 5"></path><path ${common} d="m15.7 9.4 3.5-1.6c-.1 2.7-1.2 4.4-3 5"></path><path ${common} d="M10.1 13.2h.1"></path><path ${common} d="M13.8 13.2h.1"></path><path ${common} d="M10.8 16h2.4"></path><circle class="nav-accent" cx="12" cy="10" r="1.4"></circle></svg>`,
+      records: `<svg ${attrs}><path ${common} d="M5 6.5c2.8-.9 5.1-.5 7 1.1 1.9-1.6 4.2-2 7-1.1v12c-2.8-.9-5.1-.5-7 1.1-1.9-1.6-4.2-2-7-1.1z"></path><path ${common} d="M12 7.6v12"></path><path ${common} d="M8 10h2"></path><path ${common} d="M8 13h2"></path><path ${common} d="M14 10h2"></path><path ${common} d="M14 13h2"></path><circle class="nav-accent" cx="18" cy="17" r="1.6"></circle></svg>`,
+      finance: `<svg ${attrs}><rect ${common} x="5" y="6" width="14" height="12" rx="3"></rect><path ${common} d="M8 10h5"></path><path ${common} d="M8 14h3"></path><circle ${common} cx="16" cy="14" r="2.2"></circle><path ${common} d="M16 12.8v2.4"></path><circle class="nav-accent" cx="8" cy="17.5" r="1.5"></circle></svg>`,
+      sync: `<svg ${attrs}><path ${common} d="M8.1 17.2H7.5a3.4 3.4 0 0 1-.3-6.8 4.9 4.9 0 0 1 9.3-1.7 3.9 3.9 0 0 1 .2 7.7h-.8"></path><path ${common} d="M9 15.8c1.3 1.4 3.2 1.8 4.9.9"></path><path ${common} d="m13.4 14.8.7 1.9-1.9.7"></path><path ${common} d="M15 12.1c-1.3-1.4-3.2-1.8-4.9-.9"></path><path ${common} d="m10.6 13.1-.7-1.9 1.9-.7"></path><circle class="nav-accent" cx="17.5" cy="8" r="1.6"></circle></svg>`,
+    };
+    return icons[id] || "";
   }
 
   function renderView() {

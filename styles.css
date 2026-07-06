@@ -597,19 +597,39 @@ button.item:active {
 
 .nav-icon {
   display: inline-grid;
-  width: 23px;
-  height: 23px;
+  width: 26px;
+  height: 26px;
   place-items: center;
   border-radius: 7px;
   color: var(--green-950);
   background: rgba(23, 67, 55, 0.08);
-  font-size: 11px;
-  font-weight: 900;
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.nav-svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.nav-accent {
+  fill: var(--brass);
+  opacity: 0.88;
+  stroke: none;
 }
 
 .bottom-nav button.active .nav-icon {
   color: white;
   background: var(--green-800);
+}
+
+.bottom-nav button.active .nav-accent {
+  fill: var(--brass-2);
+  opacity: 1;
+}
+
+.bottom-nav button:active .nav-icon {
+  transform: translateY(1px);
 }
 
 .modal-backdrop {
