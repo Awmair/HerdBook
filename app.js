@@ -12,6 +12,9 @@
     data: null,
     view: "dashboard",
     recordTab: "health",
+    calendarMonth: todayIso().slice(0, 7),
+    calendarSelectedDate: todayIso(),
+    calendarFilter: "all",
     selectedGoatId: null,
     search: "",
     drive: {
@@ -43,6 +46,10 @@
     const date = dateText ? new Date(`${dateText}T00:00:00`) : new Date();
     date.setDate(date.getDate() + days);
     return date.toISOString().slice(0, 10);
+  }
+
+  function monthKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
   }
 
   function fmtDate(value) {
@@ -361,6 +368,7 @@
   function titleForView() {
     return {
       dashboard: "HerdBook",
+      calendar: "Calendar",
       herd: "Herd",
       records: "Records",
       finance: "Finance",
@@ -371,6 +379,7 @@
   function subtitleForView() {
     return {
       dashboard: state.data.sync.dirty ? "Unsynced changes on this iPhone" : `Last synced ${lastSyncedText()}`,
+      calendar: "Tasks, health, breeding, and kidding dates",
       herd: "Profiles, tags, lineage, and notes",
       records: "Health, breeding, milk, weights, and tasks",
       finance: "Purchases, sales, and simple net tracking",
@@ -428,6 +437,7 @@
   function renderNav() {
     const items = [
       ["dashboard", "Today"],
+      ["calendar", "Calendar"],
       ["herd", "Herd"],
       ["records", "Records"],
       ["finance", "Finance"],
@@ -450,6 +460,7 @@
     const common = `fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"`;
     const icons = {
       dashboard: `<svg ${attrs}><rect ${common} x="5" y="5" width="14" height="14" rx="3"></rect><path ${common} d="M8 9h8"></path><path ${common} d="M9 4v3"></path><path ${common} d="M15 4v3"></path><path ${common} d="m9 13 2 2 4-4"></path><circle class="nav-accent" cx="17.2" cy="17" r="1.8"></circle></svg>`,
+      calendar: `<svg ${attrs}><rect ${common} x="4.8" y="5.4" width="14.4" height="13.2" rx="3"></rect><path ${common} d="M8.2 4v3"></path><path ${common} d="M15.8 4v3"></path><path ${common} d="M7.5 10h9"></path><path ${common} d="M8.2 13.2h.1"></path><path ${common} d="M12 13.2h.1"></path><path ${common} d="M15.8 13.2h.1"></path><circle class="nav-accent" cx="15.8" cy="16.2" r="1.7"></circle></svg>`,
       herd: `<svg ${attrs}><path ${common} d="M7.5 10.2c0-3.1 2-5.2 4.5-5.2s4.5 2.1 4.5 5.2v2.6c0 3.2-2 5.2-4.5 5.2s-4.5-2-4.5-5.2z"></path><path ${common} d="M8.3 9.4 4.8 7.8c.1 2.7 1.2 4.4 3 5"></path><path ${common} d="m15.7 9.4 3.5-1.6c-.1 2.7-1.2 4.4-3 5"></path><path ${common} d="M10.1 13.2h.1"></path><path ${common} d="M13.8 13.2h.1"></path><path ${common} d="M10.8 16h2.4"></path><circle class="nav-accent" cx="12" cy="10" r="1.4"></circle></svg>`,
       records: `<svg ${attrs}><path ${common} d="M5 6.5c2.8-.9 5.1-.5 7 1.1 1.9-1.6 4.2-2 7-1.1v12c-2.8-.9-5.1-.5-7 1.1-1.9-1.6-4.2-2-7-1.1z"></path><path ${common} d="M12 7.6v12"></path><path ${common} d="M8 10h2"></path><path ${common} d="M8 13h2"></path><path ${common} d="M14 10h2"></path><path ${common} d="M14 13h2"></path><circle class="nav-accent" cx="18" cy="17" r="1.6"></circle></svg>`,
       finance: `<svg ${attrs}><rect ${common} x="5" y="6" width="14" height="12" rx="3"></rect><path ${common} d="M8 10h5"></path><path ${common} d="M8 14h3"></path><circle ${common} cx="16" cy="14" r="2.2"></circle><path ${common} d="M16 12.8v2.4"></path><circle class="nav-accent" cx="8" cy="17.5" r="1.5"></circle></svg>`,
@@ -459,6 +470,7 @@
   }
 
   function renderView() {
+    if (state.view === "calendar") return renderCalendar();
     if (state.view === "herd") return renderHerd();
     if (state.view === "records") return renderRecords();
     if (state.view === "finance") return renderFinance();
@@ -541,6 +553,174 @@
 
   function stat(value, label, icon = "") {
     return `<div class="stat">${icon ? `<span class="stat-icon">${esc(icon)}</span>` : ""}<strong>${esc(value)}</strong><span>${esc(label)}</span></div>`;
+  }
+
+  function renderCalendar() {
+    const events = filterCalendarEvents(calendarEvents());
+    const selectedDate = state.calendarSelectedDate || todayIso();
+    const selectedEvents = events.filter((event) => event.date === selectedDate);
+    const upcomingEvents = events
+      .filter((event) => event.date >= todayIso())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 12);
+    const monthDate = new Date(`${state.calendarMonth || todayIso().slice(0, 7)}-01T00:00:00`);
+    const monthLabel = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" }).format(monthDate);
+    return `
+      <section class="toolbar">
+        <div>
+          <p class="section-kicker">Farm schedule</p>
+          <h2>${esc(monthLabel)}</h2>
+        </div>
+        <div class="toolbar-right">
+          <button class="btn small secondary" data-calendar-nav="prev" type="button">Prev</button>
+          <button class="btn small secondary" data-calendar-nav="today" type="button">Today</button>
+          <button class="btn small secondary" data-calendar-nav="next" type="button">Next</button>
+        </div>
+      </section>
+      <section class="segmented calendar-filters">
+        ${[
+          ["all", "All"],
+          ["task", "Tasks"],
+          ["health", "Health"],
+          ["breeding", "Breeding"],
+          ["kidding", "Kidding"],
+        ]
+          .map(([id, label]) => `<button class="${state.calendarFilter === id ? "active" : ""}" data-calendar-filter="${id}" type="button">${label}</button>`)
+          .join("")}
+      </section>
+      <section class="panel calendar-panel">
+        ${renderCalendarGrid(events)}
+      </section>
+      <section class="calendar-panels">
+        <section class="panel">
+          <div class="section-head compact">
+            <div>
+              <p class="section-kicker">Selected day</p>
+              <h2>${esc(fmtDate(selectedDate))}</h2>
+            </div>
+          </div>
+          ${selectedEvents.length ? `<div class="list">${selectedEvents.map(renderCalendarEventItem).join("")}</div>` : empty("No calendar items for this day.")}
+        </section>
+        <section class="panel">
+          <div class="section-head compact">
+            <div>
+              <p class="section-kicker">Next up</p>
+              <h2>Upcoming</h2>
+            </div>
+          </div>
+          ${upcomingEvents.length ? `<div class="list">${upcomingEvents.map(renderCalendarEventItem).join("")}</div>` : empty("No upcoming items in this filter.")}
+        </section>
+      </section>
+    `;
+  }
+
+  function renderCalendarGrid(events) {
+    const [year, month] = (state.calendarMonth || todayIso().slice(0, 7)).split("-").map(Number);
+    const first = new Date(year, month - 1, 1);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const byDate = events.reduce((map, event) => {
+      if (!map[event.date]) map[event.date] = [];
+      map[event.date].push(event);
+      return map;
+    }, {});
+    const cells = [];
+    for (let i = 0; i < first.getDay(); i += 1) cells.push(`<div class="calendar-day blank"></div>`);
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const dayEvents = byDate[date] || [];
+      cells.push(`
+        <button class="calendar-day ${date === todayIso() ? "today" : ""} ${date === state.calendarSelectedDate ? "active" : ""}" data-calendar-date="${date}" type="button">
+          <span>${day}</span>
+          <div class="calendar-dots">
+            ${dayEvents
+              .slice(0, 4)
+              .map((event) => `<i class="event-dot ${esc(event.kind)}"></i>`)
+              .join("")}
+          </div>
+        </button>
+      `);
+    }
+    return `
+      <div class="calendar-weekdays">${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => `<span>${day}</span>`).join("")}</div>
+      <div class="calendar-grid">${cells.join("")}</div>
+    `;
+  }
+
+  function calendarEvents() {
+    const events = [];
+    state.data.tasks
+      .filter((task) => !task.done && task.dueDate)
+      .forEach((task) =>
+        events.push({
+          kind: "task",
+          date: task.dueDate,
+          title: task.title || "Task",
+          meta: `${task.type || "Task"}${task.goatId ? ` - ${goatName(task.goatId)}` : ""}`,
+        })
+      );
+    state.data.health
+      .filter((item) => item.nextDue)
+      .forEach((item) =>
+        events.push({
+          kind: "health",
+          date: item.nextDue,
+          title: `${item.type || "Health"} due`,
+          meta: `${goatName(item.goatId)}${item.medicine ? ` - ${item.medicine}` : ""}`,
+        })
+      );
+    state.data.breedings.forEach((item) => {
+      if (item.serviceDate) {
+        events.push({
+          kind: "breeding",
+          date: item.serviceDate,
+          title: "Breeding",
+          meta: `${goatName(item.doeId)} x ${goatName(item.buckId)}`,
+        });
+      }
+      if (item.dueDate && item.status !== "Kidded") {
+        events.push({
+          kind: "kidding",
+          date: item.dueDate,
+          title: "Expected kidding",
+          meta: `${goatName(item.doeId)} bred to ${goatName(item.buckId)}`,
+        });
+      }
+    });
+    state.data.kiddings
+      .filter((item) => item.date)
+      .forEach((item) =>
+        events.push({
+          kind: "kidding",
+          date: item.date,
+          title: "Kidding recorded",
+          meta: `${goatName(item.doeId)} - ${item.kidsCount || 0} kids`,
+        })
+      );
+    return events.sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
+  }
+
+  function filterCalendarEvents(events) {
+    if (state.calendarFilter === "all") return events;
+    return events.filter((event) => event.kind === state.calendarFilter);
+  }
+
+  function renderCalendarEventItem(event) {
+    return `
+      <div class="item calendar-event">
+        <div class="item-row">
+          <p class="item-title">${esc(event.title)}</p>
+          <span class="tag ${event.kind === "health" || event.kind === "kidding" ? "warn" : "neutral"}">${esc(fmtDate(event.date))}</span>
+        </div>
+        <div class="meta"><span class="event-kind ${esc(event.kind)}">${esc(event.kind)}</span><span>${esc(event.meta || "")}</span></div>
+      </div>
+    `;
+  }
+
+  function shiftCalendarMonth(delta) {
+    const [year, month] = (state.calendarMonth || todayIso().slice(0, 7)).split("-").map(Number);
+    const next = new Date(year, month - 1 + delta, 1);
+    state.calendarMonth = monthKey(next);
+    state.calendarSelectedDate = `${state.calendarMonth}-01`;
   }
 
   function isDueSoon(dateText, days) {
@@ -949,6 +1129,29 @@
         render();
       });
     });
+    document.querySelectorAll("[data-calendar-nav]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (button.dataset.calendarNav === "today") {
+          state.calendarMonth = todayIso().slice(0, 7);
+          state.calendarSelectedDate = todayIso();
+        } else {
+          shiftCalendarMonth(button.dataset.calendarNav === "next" ? 1 : -1);
+        }
+        render();
+      });
+    });
+    document.querySelectorAll("[data-calendar-date]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.calendarSelectedDate = button.dataset.calendarDate;
+        render();
+      });
+    });
+    document.querySelectorAll("[data-calendar-filter]").forEach((button) => {
+      button.addEventListener("click", () => {
+        state.calendarFilter = button.dataset.calendarFilter;
+        render();
+      });
+    });
     document.querySelectorAll("[data-toggle-task]").forEach((button) => {
       button.addEventListener("click", async () => {
         const task = state.data.tasks.find((item) => item.id === button.dataset.toggleTask);
@@ -1184,6 +1387,12 @@
     const goat = state.data.goats.find((item) => item.id === goatId);
     const base = CONFIG.appUrl || window.location.href.split("#")[0];
     const link = `${base}#goat/${goatId}`;
+    let qr = "";
+    try {
+      qr = createQrSvg(link);
+    } catch (error) {
+      console.warn("QR generation failed", error);
+    }
     modalRoot.innerHTML = `
       <div class="modal-backdrop" role="dialog" aria-modal="true">
         <div class="modal">
@@ -1194,15 +1403,20 @@
           <div class="modal-body">
             <div class="qr-box">
               <p class="item-title">${esc(goat?.name || "Goat profile")}</p>
-              <p class="muted">Print this link as a QR code later. Scanning it opens this goat profile in HerdBook.</p>
+              <p class="muted">Scanning this QR opens the goat profile in HerdBook.</p>
+              ${qr ? `<div class="qr-preview">${qr}</div>` : `<div class="empty">QR could not be generated for this link.</div>`}
               <div class="code">${esc(link)}</div>
-              <button class="btn brass" data-copy="${esc(link)}" type="button">Copy Link</button>
+              <div class="toolbar">
+                <button class="btn brass" data-action="download-qr" data-goat="${esc(goatId)}" type="button" ${qr ? "" : "disabled"}>Download QR</button>
+                <button class="btn secondary" data-copy="${esc(link)}" type="button">Copy Link</button>
+              </div>
             </div>
           </div>
         </div>
       </div>
     `;
     modalRoot.querySelector("[data-action='close-modal']").addEventListener("click", closeModal);
+    modalRoot.querySelector("[data-action='download-qr']")?.addEventListener("click", () => downloadQrSvg(goat, link));
     modalRoot.querySelector("[data-copy]").addEventListener("click", async (event) => {
       try {
         await navigator.clipboard.writeText(event.currentTarget.dataset.copy);
@@ -1212,6 +1426,227 @@
         toast("Copy failed. Press and hold the link to copy it.");
       }
     });
+  }
+
+  function downloadQrSvg(goat, link) {
+    const name = (goat?.name || "goat").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "goat";
+    downloadFile(`herdbook-${name}-qr.svg`, createQrSvg(link), "image/svg+xml");
+  }
+
+  function createQrSvg(text) {
+    const version = 5;
+    const size = version * 4 + 17;
+    const dataCodewords = 108;
+    const eccCodewords = 26;
+    const bytes = Array.from(new TextEncoder().encode(text));
+    if (bytes.length > 106) throw new Error("QR link is too long.");
+    const data = makeQrDataCodewords(bytes, dataCodewords);
+    const allCodewords = data.concat(reedSolomonRemainder(data, eccCodewords));
+    let best = null;
+    for (let mask = 0; mask < 8; mask += 1) {
+      const candidate = buildQrMatrix(version, allCodewords, mask);
+      const score = scoreQrMatrix(candidate.modules);
+      if (!best || score < best.score) best = { ...candidate, score };
+    }
+    const quiet = 4;
+    const pixel = 8;
+    const viewSize = (size + quiet * 2) * pixel;
+    const cells = [];
+    best.modules.forEach((row, y) =>
+      row.forEach((dark, x) => {
+        if (dark) cells.push(`<rect x="${(x + quiet) * pixel}" y="${(y + quiet) * pixel}" width="${pixel}" height="${pixel}"></rect>`);
+      })
+    );
+    return `<svg class="qr-svg" viewBox="0 0 ${viewSize} ${viewSize}" role="img" aria-label="Goat profile QR code" xmlns="http://www.w3.org/2000/svg"><rect width="${viewSize}" height="${viewSize}" fill="#fffdf7"></rect><g fill="#0f2f29">${cells.join("")}</g></svg>`;
+  }
+
+  function makeQrDataCodewords(bytes, dataCodewords) {
+    const bits = [];
+    const appendBits = (value, length) => {
+      for (let i = length - 1; i >= 0; i -= 1) bits.push((value >>> i) & 1);
+    };
+    appendBits(4, 4);
+    appendBits(bytes.length, 8);
+    bytes.forEach((byte) => appendBits(byte, 8));
+    const capacity = dataCodewords * 8;
+    appendBits(0, Math.min(4, capacity - bits.length));
+    while (bits.length % 8) bits.push(0);
+    const result = [];
+    for (let i = 0; i < bits.length; i += 8) result.push(bits.slice(i, i + 8).reduce((value, bit) => (value << 1) | bit, 0));
+    for (let pad = 0; result.length < dataCodewords; pad += 1) result.push(pad % 2 ? 0x11 : 0xec);
+    return result;
+  }
+
+  function reedSolomonRemainder(data, degree) {
+    const generator = reedSolomonGenerator(degree);
+    const result = Array(degree).fill(0);
+    data.forEach((byte) => {
+      const factor = byte ^ result.shift();
+      result.push(0);
+      generator.slice(1).forEach((coefficient, index) => {
+        result[index] ^= gfMultiply(coefficient, factor);
+      });
+    });
+    return result;
+  }
+
+  function reedSolomonGenerator(degree) {
+    let result = [1];
+    for (let i = 0; i < degree; i += 1) {
+      const next = Array(result.length + 1).fill(0);
+      result.forEach((coefficient, index) => {
+        next[index] ^= gfMultiply(coefficient, 1);
+        next[index + 1] ^= gfMultiply(coefficient, gfPow(2, i));
+      });
+      result = next;
+    }
+    return result;
+  }
+
+  function gfPow(value, power) {
+    let result = 1;
+    for (let i = 0; i < power; i += 1) result = gfMultiply(result, value);
+    return result;
+  }
+
+  function gfMultiply(a, b) {
+    let result = 0;
+    for (let i = 0; i < 8; i += 1) {
+      if ((b & 1) !== 0) result ^= a;
+      const carry = (a & 0x80) !== 0;
+      a = (a << 1) & 0xff;
+      if (carry) a ^= 0x1d;
+      b >>>= 1;
+    }
+    return result;
+  }
+
+  function buildQrMatrix(version, codewords, mask) {
+    const size = version * 4 + 17;
+    const modules = Array.from({ length: size }, () => Array(size).fill(false));
+    const reserved = Array.from({ length: size }, () => Array(size).fill(false));
+    const setFunction = (x, y, dark) => {
+      if (x < 0 || y < 0 || x >= size || y >= size) return;
+      modules[y][x] = dark;
+      reserved[y][x] = true;
+    };
+    [[0, 0], [size - 7, 0], [0, size - 7]].forEach(([x, y]) => drawFinder(setFunction, x, y));
+    for (let i = 8; i < size - 8; i += 1) {
+      setFunction(6, i, i % 2 === 0);
+      setFunction(i, 6, i % 2 === 0);
+    }
+    drawAlignment(setFunction, 30, 30);
+    setFunction(8, size - 8, true);
+    drawFormatBits(setFunction, size, mask);
+
+    const bits = codewords.flatMap((byte) => Array.from({ length: 8 }, (_, i) => (byte >>> (7 - i)) & 1));
+    let bitIndex = 0;
+    let upward = true;
+    for (let right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right -= 1;
+      for (let vert = 0; vert < size; vert += 1) {
+        const y = upward ? size - 1 - vert : vert;
+        for (let dx = 0; dx < 2; dx += 1) {
+          const x = right - dx;
+          if (reserved[y][x]) continue;
+          const bit = bitIndex < bits.length ? bits[bitIndex] === 1 : false;
+          modules[y][x] = bit !== qrMask(mask, x, y);
+          bitIndex += 1;
+        }
+      }
+      upward = !upward;
+    }
+    return { modules, reserved };
+  }
+
+  function drawFinder(setFunction, x, y) {
+    for (let dy = -1; dy <= 7; dy += 1) {
+      for (let dx = -1; dx <= 7; dx += 1) {
+        const xx = x + dx;
+        const yy = y + dy;
+        const dark = dx >= 0 && dx <= 6 && dy >= 0 && dy <= 6 && (dx === 0 || dx === 6 || dy === 0 || dy === 6 || (dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4));
+        setFunction(xx, yy, dark);
+      }
+    }
+  }
+
+  function drawAlignment(setFunction, centerX, centerY) {
+    for (let dy = -2; dy <= 2; dy += 1) {
+      for (let dx = -2; dx <= 2; dx += 1) {
+        setFunction(centerX + dx, centerY + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+      }
+    }
+  }
+
+  function drawFormatBits(setFunction, size, mask) {
+    const bits = formatBits(mask);
+    const bit = (index) => ((bits >>> index) & 1) !== 0;
+    for (let i = 0; i <= 5; i += 1) setFunction(8, i, bit(i));
+    setFunction(8, 7, bit(6));
+    setFunction(8, 8, bit(7));
+    setFunction(7, 8, bit(8));
+    for (let i = 9; i < 15; i += 1) setFunction(14 - i, 8, bit(i));
+    for (let i = 0; i < 8; i += 1) setFunction(size - 1 - i, 8, bit(i));
+    for (let i = 8; i < 15; i += 1) setFunction(8, size - 15 + i, bit(i));
+  }
+
+  function formatBits(mask) {
+    const data = (1 << 3) | mask;
+    let rem = data;
+    for (let i = 0; i < 10; i += 1) rem = (rem << 1) ^ (((rem >>> 9) & 1) ? 0x537 : 0);
+    return ((data << 10) | rem) ^ 0x5412;
+  }
+
+  function qrMask(mask, x, y) {
+    return [
+      (x + y) % 2 === 0,
+      y % 2 === 0,
+      x % 3 === 0,
+      (x + y) % 3 === 0,
+      (Math.floor(y / 2) + Math.floor(x / 3)) % 2 === 0,
+      ((x * y) % 2) + ((x * y) % 3) === 0,
+      (((x * y) % 2) + ((x * y) % 3)) % 2 === 0,
+      (((x + y) % 2) + ((x * y) % 3)) % 2 === 0,
+    ][mask];
+  }
+
+  function scoreQrMatrix(modules) {
+    const size = modules.length;
+    let penalty = 0;
+    const scoreLine = (line) => {
+      let runColor = line[0];
+      let runLength = 1;
+      for (let i = 1; i <= line.length; i += 1) {
+        if (i < line.length && line[i] === runColor) runLength += 1;
+        else {
+          if (runLength >= 5) penalty += 3 + runLength - 5;
+          runColor = line[i];
+          runLength = 1;
+        }
+      }
+    };
+    modules.forEach(scoreLine);
+    for (let x = 0; x < size; x += 1) scoreLine(modules.map((row) => row[x]));
+    for (let y = 0; y < size - 1; y += 1) {
+      for (let x = 0; x < size - 1; x += 1) {
+        const color = modules[y][x];
+        if (modules[y][x + 1] === color && modules[y + 1][x] === color && modules[y + 1][x + 1] === color) penalty += 3;
+      }
+    }
+    const pattern = "10111010000";
+    const reverse = "00001011101";
+    const scorePattern = (line) => {
+      const text = line.map((value) => (value ? "1" : "0")).join("");
+      for (let i = 0; i <= text.length - 11; i += 1) {
+        const chunk = text.slice(i, i + 11);
+        if (chunk === pattern || chunk === reverse) penalty += 40;
+      }
+    };
+    modules.forEach(scorePattern);
+    for (let x = 0; x < size; x += 1) scorePattern(modules.map((row) => row[x]));
+    const dark = modules.flat().filter(Boolean).length;
+    penalty += Math.floor(Math.abs((dark * 20) / (size * size) - 10)) * 10;
+    return penalty;
   }
 
   function exportJson() {
