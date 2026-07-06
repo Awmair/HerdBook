@@ -10,7 +10,15 @@
 
 ## GitHub Pages Settings
 
-Use GitHub Pages with:
+Use the included GitHub Actions workflow:
+
+- Workflow: `.github/workflows/pages.yml`
+- Source: repository root
+- Trigger: push to `main`
+
+If GitHub asks for a Pages source in Settings, choose GitHub Actions.
+
+Alternative branch settings:
 
 - Source: deploy from a branch
 - Branch: `main`
