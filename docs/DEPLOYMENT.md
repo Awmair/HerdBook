@@ -15,6 +15,7 @@ Use the included GitHub Actions workflow:
 - Workflow: `.github/workflows/pages.yml`
 - Source: repository root
 - Trigger: push to `main`
+- Pages enablement: handled by `actions/configure-pages`
 
 If GitHub asks for a Pages source in Settings, choose GitHub Actions.
 
