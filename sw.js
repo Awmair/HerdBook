@@ -1,4 +1,4 @@
-const CACHE_NAME = "herdbook-v3";
+const CACHE_NAME = "herdbook-v4";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -6,6 +6,7 @@ const APP_ASSETS = [
   "./app.js",
   "./config.js",
   "./manifest.webmanifest",
+  "./assets/herdbook-open-book-goat-icon-concept.png",
   "./assets/icons/apple-touch-icon.png",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"
@@ -33,8 +34,10 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        if (response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
         return response;
       })
       .catch(() => caches.match(event.request))

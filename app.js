@@ -112,6 +112,33 @@
     };
   }
 
+  function normalizeFarmData(input, { dirty } = {}) {
+    const base = defaultFarm();
+    const data = input && typeof input === "object" ? input : {};
+    const normalized = {
+      ...base,
+      ...data,
+      meta: { ...base.meta, ...(data.meta || {}) },
+      settings: { ...base.settings, ...(data.settings || {}) },
+      sync: { ...base.sync, ...(data.sync || {}) },
+    };
+    ["goats", "health", "breedings", "kiddings", "weights", "milk", "expenses", "tasks"].forEach((key) => {
+      normalized[key] = Array.isArray(data[key]) ? data[key] : [];
+    });
+    normalized.meta.localRevision = Number(normalized.meta.localRevision || 0);
+    if (typeof dirty === "boolean") normalized.sync.dirty = dirty;
+    return normalized;
+  }
+
+  function parseFarmJson(raw) {
+    try {
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      console.warn("Stored HerdBook data could not be parsed", error);
+      return null;
+    }
+  }
+
   function demoFarm() {
     const data = defaultFarm();
     data.meta.farmName = "Cedar Ridge Goats";
@@ -231,7 +258,7 @@
       const db = await openDb();
       if (!db) {
         const raw = localStorage.getItem("herdbook-farm");
-        return raw ? JSON.parse(raw) : null;
+        return parseFarmJson(raw);
       }
       return await new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readonly");
@@ -242,7 +269,7 @@
     } catch (error) {
       console.warn("Falling back after storage read failed", error);
       const raw = localStorage.getItem("herdbook-farm");
-      return raw ? JSON.parse(raw) : null;
+      return parseFarmJson(raw);
     }
   }
 
@@ -261,7 +288,12 @@
       });
     } catch (error) {
       console.warn("Falling back after storage write failed", error);
-      localStorage.setItem("herdbook-farm", JSON.stringify(data));
+      try {
+        localStorage.setItem("herdbook-farm", JSON.stringify(data));
+      } catch (fallbackError) {
+        console.error("Local storage write failed", fallbackError);
+        throw fallbackError;
+      }
     }
   }
 
@@ -271,7 +303,14 @@
       state.data.meta.localRevision += 1;
       state.data.sync.dirty = true;
     }
-    await writeStoredFarm(state.data);
+    try {
+      await writeStoredFarm(state.data);
+    } catch (error) {
+      console.error("Could not save HerdBook data", error);
+      render();
+      toast("Could not save on this iPhone. Storage may be full.");
+      return;
+    }
     render();
     if (toastText) toast(toastText);
   }
@@ -808,6 +847,7 @@
   function renderSync() {
     const googleReady = Boolean(CONFIG.googleClientId);
     const signedIn = Boolean(state.drive.token);
+    const canUseDrive = googleReady && !state.drive.busy;
     return `
       <section class="panel">
         <h2>Save & Sync</h2>
@@ -819,9 +859,9 @@
           <p class="muted">Edits always save on this iPhone first. Tap Save & Sync and wait for Synced before closing the app.</p>
           <p class="muted">Restore from Drive replaces this phone's local copy with the HerdBook file already saved in Google Drive. Use it on a new phone, after clearing Safari data, or when recovering from Drive.</p>
           <div class="toolbar">
-            <button class="btn brass" data-action="save-sync" type="button" ${googleReady ? "" : "disabled"}>Save & Sync</button>
-            <button class="btn ${signedIn ? "" : "secondary"}" data-action="google-signin" type="button" ${googleReady && !signedIn ? "" : "disabled"}>${signedIn ? "Signed In" : "Sign In"}</button>
-            <button class="btn secondary" data-action="load-drive" type="button" ${googleReady ? "" : "disabled"}>Restore from Drive</button>
+            <button class="btn brass" data-action="save-sync" type="button" ${canUseDrive ? "" : "disabled"}>Save & Sync</button>
+            <button class="btn ${signedIn ? "" : "secondary"}" data-action="google-signin" type="button" ${canUseDrive && !signedIn ? "" : "disabled"}>${signedIn ? "Signed In" : "Sign In"}</button>
+            <button class="btn secondary" data-action="load-drive" type="button" ${canUseDrive ? "" : "disabled"}>Restore from Drive</button>
           </div>
           ${state.drive.message ? `<p>${esc(state.drive.message)}</p>` : ""}
           ${state.drive.error ? `<p class="tag danger">${esc(state.drive.error)}</p>` : ""}
@@ -1164,8 +1204,13 @@
     `;
     modalRoot.querySelector("[data-action='close-modal']").addEventListener("click", closeModal);
     modalRoot.querySelector("[data-copy]").addEventListener("click", async (event) => {
-      await navigator.clipboard.writeText(event.currentTarget.dataset.copy);
-      toast("QR link copied.");
+      try {
+        await navigator.clipboard.writeText(event.currentTarget.dataset.copy);
+        toast("QR link copied.");
+      } catch (error) {
+        console.warn("Clipboard copy failed", error);
+        toast("Copy failed. Press and hold the link to copy it.");
+      }
     });
   }
 
@@ -1189,22 +1234,31 @@
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = name;
+    link.style.display = "none";
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(link.href);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   }
 
   async function importJson(event) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const text = await file.text();
-    const imported = JSON.parse(text);
-    if (!imported.meta || !Array.isArray(imported.goats)) {
-      toast("That backup does not look like a HerdBook file.");
-      return;
+    try {
+      const text = await file.text();
+      const imported = JSON.parse(text);
+      if (!imported.meta || !Array.isArray(imported.goats)) {
+        toast("That backup does not look like a HerdBook file.");
+        return;
+      }
+      state.data = normalizeFarmData(imported, { dirty: true });
+      await persist({ toastText: "Backup imported on this iPhone." });
+    } catch (error) {
+      console.warn("Import failed", error);
+      toast("Could not import that backup file.");
+    } finally {
+      event.target.value = "";
     }
-    state.data = imported;
-    state.data.sync = { ...defaultFarm().sync, ...state.data.sync, dirty: true };
-    await persist({ toastText: "Backup imported on this iPhone." });
   }
 
   function waitForGoogle() {
@@ -1223,6 +1277,23 @@
     });
   }
 
+  async function requestGoogleToken(prompt = "consent") {
+    await waitForGoogle();
+    return new Promise((resolve, reject) => {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.googleClientId,
+        scope: DRIVE_SCOPE,
+        prompt,
+        callback: (response) => {
+          if (response.error) reject(new Error(response.error));
+          else if (response.access_token) resolve(response.access_token);
+          else reject(new Error("Google sign-in did not return access."));
+        },
+      });
+      client.requestAccessToken();
+    });
+  }
+
   async function signInToGoogle() {
     if (!CONFIG.googleClientId) {
       state.drive.error = "Missing Google OAuth client ID.";
@@ -1234,19 +1305,7 @@
     state.drive.message = "Waiting for Google sign-in...";
     render();
     try {
-      await waitForGoogle();
-      const token = await new Promise((resolve, reject) => {
-        const client = google.accounts.oauth2.initTokenClient({
-          client_id: CONFIG.googleClientId,
-          scope: DRIVE_SCOPE,
-          prompt: "",
-          callback: (response) => {
-            if (response.error) reject(new Error(response.error));
-            else resolve(response.access_token);
-          },
-        });
-        client.requestAccessToken();
-      });
+      const token = await requestGoogleToken("consent");
       state.drive.token = token;
       state.drive.message = "Google Drive access ready.";
       state.drive.busy = false;
@@ -1261,10 +1320,39 @@
   }
 
   async function ensureToken() {
-    return state.drive.token || signInToGoogle();
+    if (state.drive.token) return state.drive.token;
+    if (!CONFIG.googleClientId) {
+      state.drive.error = "Missing Google OAuth client ID.";
+      render();
+      return "";
+    }
+    state.drive.message = "Waiting for Google sign-in...";
+    render();
+    try {
+      const token = await requestGoogleToken("consent");
+      state.drive.token = token;
+      return token;
+    } catch (error) {
+      state.drive.error = error.message;
+      render();
+      return "";
+    }
   }
 
-  async function driveFetch(path, options = {}) {
+  async function driveError(response) {
+    const text = await response.text();
+    let message = text || `Drive request failed: ${response.status}`;
+    try {
+      message = JSON.parse(text).error?.message || message;
+    } catch {
+      // Keep the original text when Google returns a non-JSON error.
+    }
+    const error = new Error(message);
+    error.status = response.status;
+    return error;
+  }
+
+  async function driveFetch(path, options = {}, retryAuth = true) {
     const token = await ensureToken();
     if (!token) throw new Error("Google sign-in is not ready.");
     const response = await fetch(path, {
@@ -1274,9 +1362,16 @@
         ...(options.headers || {}),
       },
     });
+    if (response.status === 401 && retryAuth) {
+      state.drive.token = "";
+      state.drive.message = "Google access expired. Please sign in again...";
+      render();
+      const freshToken = await requestGoogleToken("consent");
+      state.drive.token = freshToken;
+      return driveFetch(path, options, false);
+    }
     if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || `Drive request failed: ${response.status}`);
+      throw await driveError(response);
     }
     return response;
   }
@@ -1337,8 +1432,20 @@
     state.drive.message = "Syncing to Google Drive...";
     render();
     try {
-      const existing = state.data.sync.driveFileId ? { id: state.data.sync.driveFileId } : await findDriveFile();
-      const result = existing ? await updateDriveFile(existing.id) : await createDriveFile();
+      let existing = state.data.sync.driveFileId ? { id: state.data.sync.driveFileId } : await findDriveFile();
+      let result = null;
+      if (existing) {
+        try {
+          result = await updateDriveFile(existing.id);
+        } catch (error) {
+          if (error.status !== 404) throw error;
+          state.data.sync.driveFileId = "";
+          existing = await findDriveFile();
+          result = existing ? await updateDriveFile(existing.id) : await createDriveFile();
+        }
+      } else {
+        result = await createDriveFile();
+      }
       state.data.sync.driveFileId = result.id;
       state.data.sync.driveModifiedTime = result.modifiedTime || "";
       state.data.sync.lastSyncedAt = new Date().toISOString();
@@ -1373,9 +1480,8 @@
         render();
         return;
       }
-      const remote = await downloadDriveFile(file.id);
+      const remote = normalizeFarmData(await downloadDriveFile(file.id), { dirty: false });
       remote.sync = {
-        ...defaultFarm().sync,
         ...remote.sync,
         dirty: false,
         driveFileId: file.id,
@@ -1398,7 +1504,12 @@
   function parseRoute() {
     const hash = window.location.hash.replace(/^#\/?/, "");
     if (hash.startsWith("goat/")) {
-      const goatId = decodeURIComponent(hash.slice(5));
+      let goatId = "";
+      try {
+        goatId = decodeURIComponent(hash.slice(5));
+      } catch {
+        return;
+      }
       if (state.data?.goats?.some((goat) => goat.id === goatId)) {
         state.selectedGoatId = goatId;
         state.view = "herd";
@@ -1407,8 +1518,7 @@
   }
 
   async function init() {
-    state.data = (await readStoredFarm()) || defaultFarm();
-    if (!state.data.sync) state.data.sync = defaultFarm().sync;
+    state.data = normalizeFarmData((await readStoredFarm()) || defaultFarm());
     parseRoute();
     render();
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
