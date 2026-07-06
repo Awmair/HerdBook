@@ -40,7 +40,7 @@ http://127.0.0.1:5173/
 
 ## Deployment
 
-Target deployment is GitHub Pages from the public `Awmair/HerdBook` repository:
+Target deployment is GitHub Pages from the public `Awmair/HerdBook` repository using the `gh-pages` branch:
 
 ```text
 https://awmair.github.io/HerdBook/

@@ -10,20 +10,19 @@
 
 ## GitHub Pages Settings
 
-Use the included GitHub Actions workflow:
+The static app has been pushed to a `gh-pages` branch. GitHub still requires Pages to be enabled once in repository settings.
 
-- Workflow: `.github/workflows/pages.yml`
-- Source: repository root
-- Trigger: push to `main`
-- Pages enablement: handled by `actions/configure-pages`
-
-If GitHub asks for a Pages source in Settings, choose GitHub Actions.
-
-Alternative branch settings:
+Use:
 
 - Source: deploy from a branch
-- Branch: `main`
+- Branch: `gh-pages`
 - Folder: `/root`
+
+After saving, the expected URL is:
+
+```text
+https://awmair.github.io/HerdBook/
+```
 
 The app is static and does not need a build step.
 
