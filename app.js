@@ -764,6 +764,7 @@
 
   function renderSync() {
     const googleReady = Boolean(CONFIG.googleClientId);
+    const signedIn = Boolean(state.drive.token);
     return `
       <section class="panel">
         <h2>Save & Sync</h2>
@@ -773,9 +774,10 @@
             <span class="tag ${state.data.sync.dirty ? "warn" : ""}">${esc(lastSyncedText())}</span>
           </div>
           <p class="muted">Edits always save on this iPhone first. Tap Save & Sync and wait for Synced before closing the app.</p>
+          <p class="muted">Load Drive replaces this phone's local copy with the HerdBook file already saved in Google Drive. Use it on a new phone, after clearing Safari data, or when recovering from Drive.</p>
           <div class="toolbar">
             <button class="btn brass" data-action="save-sync" type="button" ${googleReady ? "" : "disabled"}>Save & Sync</button>
-            <button class="btn secondary" data-action="google-signin" type="button" ${googleReady ? "" : "disabled"}>Sign In</button>
+            <button class="btn ${signedIn ? "" : "secondary"}" data-action="google-signin" type="button" ${googleReady && !signedIn ? "" : "disabled"}>${signedIn ? "Signed In" : "Sign In"}</button>
             <button class="btn secondary" data-action="load-drive" type="button" ${googleReady ? "" : "disabled"}>Load Drive</button>
           </div>
           ${state.drive.message ? `<p>${esc(state.drive.message)}</p>` : ""}

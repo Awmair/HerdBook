@@ -269,6 +269,12 @@ h3 {
   transform: translateY(1px);
 }
 
+.btn:disabled {
+  cursor: default;
+  opacity: 0.78;
+  transform: none;
+}
+
 .btn.secondary {
   color: var(--green-950);
   border-color: var(--line);
