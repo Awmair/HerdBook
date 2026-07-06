@@ -391,7 +391,7 @@
       ["dashboard", "Today", "T"],
       ["herd", "Herd", "H"],
       ["records", "Records", "R"],
-      ["finance", "Money", "$"],
+      ["finance", "Finance", "$"],
       ["sync", "Sync", "S"],
     ];
     return `
@@ -467,7 +467,7 @@
           <section class="panel">
             <div class="section-head compact">
               <div>
-                <p class="section-kicker">Money</p>
+                <p class="section-kicker">Finance</p>
                 <h2>Recent Expenses</h2>
               </div>
             </div>
@@ -812,7 +812,7 @@
           </div>
           ${state.drive.message ? `<p>${esc(state.drive.message)}</p>` : ""}
           ${state.drive.error ? `<p class="tag danger">${esc(state.drive.error)}</p>` : ""}
-          ${googleReady ? "" : `<p class="muted">Google Drive is waiting for the browser OAuth client ID in config.js.</p>`}
+          ${googleReady ? "" : `<p class="muted">Google Drive is not ready yet.</p>`}
         </div>
       </section>
       <section class="panel">
@@ -823,10 +823,6 @@
           <label class="btn secondary" for="import-file">Import JSON</label>
           <input id="import-file" type="file" accept="application/json" hidden />
         </div>
-      </section>
-      <section class="panel">
-        <h2>App Setup</h2>
-        <div class="code">Google client ID: ${CONFIG.googleClientId ? "configured" : "not configured"}\nDrive file: ${esc(CONFIG.driveFileName || "herdbook-farm.json")}\nRevision: ${esc(state.data.meta.localRevision)}</div>
       </section>
     `;
   }
