@@ -15,6 +15,7 @@
     calendarMonth: todayIso().slice(0, 7),
     calendarSelectedDate: todayIso(),
     calendarFilter: "all",
+    activeForm: null,
     selectedGoatId: null,
     search: "",
     drive: {
@@ -342,7 +343,6 @@
     parseRoute();
     if (!state.data.meta.setupComplete) {
       app.innerHTML = renderSetup();
-      bindSetup();
       return;
     }
 
@@ -362,7 +362,6 @@
       ${renderNav()}
       <main>${renderView()}</main>
     `;
-    bindApp();
   }
 
   function titleForView() {
@@ -1069,37 +1068,140 @@
     return `<div class="empty">${esc(message)}</div>`;
   }
 
-  function bindSetup() {
-    document.getElementById("setup-form")?.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const form = new FormData(event.currentTarget);
-      state.data.meta.farmName = form.get("farmName").trim();
-      state.data.meta.setupComplete = true;
-      state.data.settings.weightUnit = form.get("weightUnit");
-      state.data.settings.currency = form.get("currency");
-      await persist({ toastText: "Farm created on this iPhone." });
+  function bindGlobalEvents() {
+    document.addEventListener("click", (event) => {
+      const button = event.target?.closest?.("button");
+      if (!button || button.disabled) return;
+      void handleGlobalClick(event, button);
     });
-    document.querySelector("[data-action='load-demo']")?.addEventListener("click", async () => {
-      state.data = demoFarm();
-      await persist({ toastText: "Demo data loaded." });
+    document.addEventListener("input", handleGlobalInput);
+    document.addEventListener("change", (event) => {
+      if (event.target?.id === "import-file") void importJson(event);
+    });
+    document.addEventListener("submit", (event) => {
+      void handleGlobalSubmit(event);
     });
   }
 
-  function bindApp() {
-    document.querySelectorAll("[data-view]").forEach((button) => {
-      button.addEventListener("click", () => {
-        state.view = button.dataset.view;
-        render();
-      });
-    });
-    document.querySelector("[data-action='goto-sync']")?.addEventListener("click", () => {
+  async function handleGlobalClick(event, button) {
+    if (button.dataset.action || button.dataset.view || button.dataset.form || button.dataset.selectGoat || button.dataset.editGoat || button.dataset.recordTab || button.dataset.calendarNav || button.dataset.calendarDate || button.dataset.calendarFilter || button.dataset.toggleTask || button.dataset.copy) {
+      event.preventDefault();
+    }
+
+    if (button.dataset.action === "close-modal") {
+      closeModal();
+      return;
+    }
+    if (button.dataset.copy) {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copy);
+        toast("QR link copied.");
+      } catch (error) {
+        console.warn("Clipboard copy failed", error);
+        toast("Copy failed. Press and hold the link to copy it.");
+      }
+      return;
+    }
+    if (button.dataset.action === "download-qr") {
+      const goat = state.data.goats.find((item) => item.id === button.dataset.goat);
+      const base = CONFIG.appUrl || window.location.href.split("#")[0];
+      downloadQrSvg(goat, `${base}#goat/${button.dataset.goat}`);
+      return;
+    }
+    if (button.dataset.view) {
+      state.view = button.dataset.view;
+      render();
+      return;
+    }
+    if (button.dataset.action === "goto-sync") {
       state.view = "sync";
       render();
-    });
-    document.querySelectorAll("[data-form]").forEach((button) => {
-      button.addEventListener("click", () => openRecordForm(button.dataset.form, button.dataset.goat || ""));
-    });
-    document.querySelector("[data-search='herd']")?.addEventListener("input", (event) => {
+      return;
+    }
+    if (button.dataset.action === "load-demo") {
+      state.data = demoFarm();
+      await persist({ toastText: "Demo data loaded." });
+      return;
+    }
+    if (button.dataset.form) {
+      openRecordForm(button.dataset.form, button.dataset.goat || "");
+      return;
+    }
+    if (button.dataset.action === "clear-search") {
+      state.search = "";
+      render();
+      return;
+    }
+    if (button.dataset.selectGoat) {
+      state.selectedGoatId = button.dataset.selectGoat;
+      window.location.hash = `goat/${state.selectedGoatId}`;
+      render();
+      return;
+    }
+    if (button.dataset.editGoat) {
+      openGoatForm(state.data.goats.find((goat) => goat.id === button.dataset.editGoat));
+      return;
+    }
+    if (button.dataset.recordTab) {
+      state.recordTab = button.dataset.recordTab;
+      render();
+      return;
+    }
+    if (button.dataset.calendarNav) {
+      if (button.dataset.calendarNav === "today") {
+        state.calendarMonth = todayIso().slice(0, 7);
+        state.calendarSelectedDate = todayIso();
+      } else {
+        shiftCalendarMonth(button.dataset.calendarNav === "next" ? 1 : -1);
+      }
+      render();
+      return;
+    }
+    if (button.dataset.calendarDate) {
+      state.calendarSelectedDate = button.dataset.calendarDate;
+      render();
+      return;
+    }
+    if (button.dataset.calendarFilter) {
+      state.calendarFilter = button.dataset.calendarFilter;
+      render();
+      return;
+    }
+    if (button.dataset.toggleTask) {
+      const task = state.data.tasks.find((item) => item.id === button.dataset.toggleTask);
+      if (task) {
+        task.done = !task.done;
+        await persist({ toastText: task.done ? "Task completed." : "Task reopened." });
+      }
+      return;
+    }
+    if (button.dataset.action === "show-qr") {
+      showQrLink(button.dataset.goat);
+      return;
+    }
+    if (button.dataset.action === "export-json") {
+      exportJson();
+      return;
+    }
+    if (button.dataset.action === "export-goats") {
+      exportGoatsCsv();
+      return;
+    }
+    if (button.dataset.action === "google-signin") {
+      if (!state.drive.busy) await signInToGoogle();
+      return;
+    }
+    if (button.dataset.action === "save-sync") {
+      if (!state.drive.busy) await saveAndSync();
+      return;
+    }
+    if (button.dataset.action === "load-drive") {
+      if (!state.drive.busy) await loadFromDrive();
+    }
+  }
+
+  function handleGlobalInput(event) {
+    if (event.target?.matches?.("[data-search='herd']")) {
       const cursor = event.target.selectionStart;
       state.search = event.target.value;
       render();
@@ -1108,66 +1210,31 @@
         input.focus();
         input.setSelectionRange(cursor, cursor);
       }
-    });
-    document.querySelector("[data-action='clear-search']")?.addEventListener("click", () => {
-      state.search = "";
-      render();
-    });
-    document.querySelectorAll("[data-select-goat]").forEach((button) => {
-      button.addEventListener("click", () => {
-        state.selectedGoatId = button.dataset.selectGoat;
-        window.location.hash = `goat/${state.selectedGoatId}`;
-        render();
+    }
+  }
+
+  async function handleGlobalSubmit(event) {
+    if (event.target?.id === "setup-form") {
+      event.preventDefault();
+      const form = new FormData(event.target);
+      state.data.meta.farmName = form.get("farmName").trim();
+      state.data.meta.setupComplete = true;
+      state.data.settings.weightUnit = form.get("weightUnit");
+      state.data.settings.currency = form.get("currency");
+      await persist({ toastText: "Farm created on this iPhone." });
+      return;
+    }
+    if (event.target?.id === "record-form" && state.activeForm) {
+      event.preventDefault();
+      const form = new FormData(event.target);
+      const next = {};
+      state.activeForm.fields.forEach((field) => {
+        next[field.name] = normalizeDate(form.get(field.name));
       });
-    });
-    document.querySelectorAll("[data-edit-goat]").forEach((button) => {
-      button.addEventListener("click", () => openGoatForm(state.data.goats.find((goat) => goat.id === button.dataset.editGoat)));
-    });
-    document.querySelectorAll("[data-record-tab]").forEach((button) => {
-      button.addEventListener("click", () => {
-        state.recordTab = button.dataset.recordTab;
-        render();
-      });
-    });
-    document.querySelectorAll("[data-calendar-nav]").forEach((button) => {
-      button.addEventListener("click", () => {
-        if (button.dataset.calendarNav === "today") {
-          state.calendarMonth = todayIso().slice(0, 7);
-          state.calendarSelectedDate = todayIso();
-        } else {
-          shiftCalendarMonth(button.dataset.calendarNav === "next" ? 1 : -1);
-        }
-        render();
-      });
-    });
-    document.querySelectorAll("[data-calendar-date]").forEach((button) => {
-      button.addEventListener("click", () => {
-        state.calendarSelectedDate = button.dataset.calendarDate;
-        render();
-      });
-    });
-    document.querySelectorAll("[data-calendar-filter]").forEach((button) => {
-      button.addEventListener("click", () => {
-        state.calendarFilter = button.dataset.calendarFilter;
-        render();
-      });
-    });
-    document.querySelectorAll("[data-toggle-task]").forEach((button) => {
-      button.addEventListener("click", async () => {
-        const task = state.data.tasks.find((item) => item.id === button.dataset.toggleTask);
-        if (task) {
-          task.done = !task.done;
-          await persist({ toastText: task.done ? "Task completed." : "Task reopened." });
-        }
-      });
-    });
-    document.querySelector("[data-action='show-qr']")?.addEventListener("click", (event) => showQrLink(event.currentTarget.dataset.goat));
-    document.querySelector("[data-action='export-json']")?.addEventListener("click", exportJson);
-    document.querySelector("[data-action='export-goats']")?.addEventListener("click", exportGoatsCsv);
-    document.getElementById("import-file")?.addEventListener("change", importJson);
-    document.querySelector("[data-action='google-signin']")?.addEventListener("click", signInToGoogle);
-    document.querySelector("[data-action='save-sync']")?.addEventListener("click", saveAndSync);
-    document.querySelector("[data-action='load-drive']")?.addEventListener("click", loadFromDrive);
+      const onSave = state.activeForm.onSave;
+      closeModal();
+      await onSave(next);
+    }
   }
 
   function openRecordForm(type, goatId = "") {
@@ -1332,6 +1399,7 @@
   }
 
   function openForm({ title, values, fields, onSave }) {
+    state.activeForm = { fields, onSave };
     modalRoot.innerHTML = `
       <div class="modal-backdrop" role="dialog" aria-modal="true">
         <form class="modal" id="record-form">
@@ -1351,17 +1419,6 @@
         </form>
       </div>
     `;
-    modalRoot.querySelectorAll("[data-action='close-modal']").forEach((button) => button.addEventListener("click", closeModal));
-    modalRoot.querySelector("#record-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const form = new FormData(event.currentTarget);
-      const next = {};
-      fields.forEach((field) => {
-        next[field.name] = normalizeDate(form.get(field.name));
-      });
-      closeModal();
-      await onSave(next);
-    });
   }
 
   function renderField(field, value = "") {
@@ -1380,6 +1437,7 @@
   }
 
   function closeModal() {
+    state.activeForm = null;
     modalRoot.innerHTML = "";
   }
 
@@ -1415,17 +1473,6 @@
         </div>
       </div>
     `;
-    modalRoot.querySelector("[data-action='close-modal']").addEventListener("click", closeModal);
-    modalRoot.querySelector("[data-action='download-qr']")?.addEventListener("click", () => downloadQrSvg(goat, link));
-    modalRoot.querySelector("[data-copy]").addEventListener("click", async (event) => {
-      try {
-        await navigator.clipboard.writeText(event.currentTarget.dataset.copy);
-        toast("QR link copied.");
-      } catch (error) {
-        console.warn("Clipboard copy failed", error);
-        toast("Copy failed. Press and hold the link to copy it.");
-      }
-    });
   }
 
   function downloadQrSvg(goat, link) {
@@ -1955,6 +2002,7 @@
   async function init() {
     state.data = normalizeFarmData((await readStoredFarm()) || defaultFarm());
     parseRoute();
+    bindGlobalEvents();
     render();
     if ("serviceWorker" in navigator && location.protocol !== "file:") {
       navigator.serviceWorker.register("./sw.js").catch((error) => console.warn("Service worker failed", error));
