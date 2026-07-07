@@ -17,6 +17,7 @@
     calendarFilter: "all",
     activeForm: null,
     lastPointerAction: { key: "", at: 0 },
+    longPress: { timer: null, suppressUntil: 0 },
     selectedGoatId: null,
     search: "",
     drive: {
@@ -821,7 +822,7 @@
 
   function renderGoatItem(goat) {
     return `
-      <button class="item" data-select-goat="${esc(goat.id)}" type="button">
+      <button class="item" data-select-goat="${esc(goat.id)}" data-action-menu-type="goat" data-action-menu-id="${esc(goat.id)}" type="button">
         <div class="item-row">
           <p class="item-title">${esc(goat.name || "Unnamed goat")}</p>
           <span class="tag">${esc(goat.tagId || "No tag")}</span>
@@ -849,7 +850,10 @@
             <p class="eyebrow" style="color: var(--muted);">${esc(goat.tagId || "No tag")}</p>
             <h2>${esc(goat.name || "Unnamed goat")}</h2>
           </div>
-          <button class="btn small secondary" data-edit-goat="${esc(goat.id)}" type="button">Edit</button>
+          <div class="toolbar compact">
+            <button class="btn small secondary" data-edit-goat="${esc(goat.id)}" type="button">Edit</button>
+            <button class="btn small secondary" data-action="open-actions" data-action-menu-type="goat" data-action-menu-id="${esc(goat.id)}" type="button">More</button>
+          </div>
         </div>
         <div class="meta">
           <span class="tag">${esc(goat.sex)}</span>
@@ -934,8 +938,8 @@
 
   function renderHealthItem(item) {
     return `
-      <div class="item">
-        <div class="item-row"><p class="item-title">${esc(item.type)} - ${esc(goatName(item.goatId))}</p><span class="tag">${esc(fmtDate(item.date))}</span></div>
+      <div class="item" data-action-menu-type="health" data-action-menu-id="${esc(item.id)}">
+        <div class="item-row"><p class="item-title">${esc(item.type)} - ${esc(goatName(item.goatId))}</p><span class="tag">${esc(fmtDate(item.date))}</span>${recordActionButton("health", item.id)}</div>
         <div class="meta"><span>${esc(item.medicine || "No medicine")}</span><span>Next: ${esc(fmtDate(item.nextDue))}</span></div>
       </div>
     `;
@@ -943,8 +947,8 @@
 
   function renderBreedingItem(item) {
     return `
-      <div class="item">
-        <div class="item-row"><p class="item-title">${esc(goatName(item.doeId))} x ${esc(goatName(item.buckId))}</p><span class="tag warn">${esc(item.status)}</span></div>
+      <div class="item" data-action-menu-type="breeding" data-action-menu-id="${esc(item.id)}">
+        <div class="item-row"><p class="item-title">${esc(goatName(item.doeId))} x ${esc(goatName(item.buckId))}</p><span class="tag warn">${esc(item.status)}</span>${recordActionButton("breeding", item.id)}</div>
         <div class="meta"><span>Served ${esc(fmtDate(item.serviceDate))}</span><span>Due ${esc(fmtDate(item.dueDate))}</span></div>
       </div>
     `;
@@ -952,8 +956,8 @@
 
   function renderKiddingItem(item) {
     return `
-      <div class="item">
-        <div class="item-row"><p class="item-title">${esc(goatName(item.doeId))}</p><span class="tag">${esc(fmtDate(item.date))}</span></div>
+      <div class="item" data-action-menu-type="kidding" data-action-menu-id="${esc(item.id)}">
+        <div class="item-row"><p class="item-title">${esc(goatName(item.doeId))}</p><span class="tag">${esc(fmtDate(item.date))}</span>${recordActionButton("kidding", item.id)}</div>
         <div class="meta"><span>${esc(item.kidsCount || 0)} kids</span><span>${esc(item.notes || "")}</span></div>
       </div>
     `;
@@ -961,8 +965,8 @@
 
   function renderWeightItem(item) {
     return `
-      <div class="item">
-        <div class="item-row"><p class="item-title">${esc(goatName(item.goatId))}</p><span class="tag">${esc(item.weight)} ${esc(state.data.settings.weightUnit)}</span></div>
+      <div class="item" data-action-menu-type="weight" data-action-menu-id="${esc(item.id)}">
+        <div class="item-row"><p class="item-title">${esc(goatName(item.goatId))}</p><span class="tag">${esc(item.weight)} ${esc(state.data.settings.weightUnit)}</span>${recordActionButton("weight", item.id)}</div>
         <div class="meta"><span>${esc(fmtDate(item.date))}</span><span>${esc(item.notes || "")}</span></div>
       </div>
     `;
@@ -974,8 +978,8 @@
 
   function renderMilkItem(item) {
     return `
-      <div class="item">
-        <div class="item-row"><p class="item-title">${esc(goatName(item.goatId))}</p><span class="tag">${esc(milkTotal(item))} ${esc(state.data.settings.milkUnit)}</span></div>
+      <div class="item" data-action-menu-type="milk" data-action-menu-id="${esc(item.id)}">
+        <div class="item-row"><p class="item-title">${esc(goatName(item.goatId))}</p><span class="tag">${esc(milkTotal(item))} ${esc(state.data.settings.milkUnit)}</span>${recordActionButton("milk", item.id)}</div>
         <div class="meta"><span>${esc(fmtDate(item.date))}</span><span>${esc(item.notes || "")}</span></div>
       </div>
     `;
@@ -983,14 +987,19 @@
 
   function renderTaskItem(item) {
     return `
-      <div class="item">
+      <div class="item" data-action-menu-type="task" data-action-menu-id="${esc(item.id)}">
         <div class="item-row">
           <p class="item-title">${esc(item.title)}</p>
           <button class="btn small ${item.done ? "secondary" : ""}" data-toggle-task="${esc(item.id)}" type="button">${item.done ? "Done" : "Mark Done"}</button>
+          ${recordActionButton("task", item.id)}
         </div>
         <div class="meta"><span>${esc(item.type || "Task")}</span><span>${esc(fmtDate(item.dueDate))}</span><span>${esc(goatName(item.goatId))}</span></div>
       </div>
     `;
+  }
+
+  function recordActionButton(type, id) {
+    return `<button class="btn small secondary item-action" data-action="open-actions" data-action-menu-type="${esc(type)}" data-action-menu-id="${esc(id)}" type="button" aria-label="Record actions">More</button>`;
   }
 
   function renderFinance() {
@@ -1017,8 +1026,8 @@
 
   function renderExpenseItem(item) {
     return `
-      <div class="item">
-        <div class="item-row"><p class="item-title">${esc(item.category)}</p><span class="tag ${item.category === "Sale" ? "" : "warn"}">${esc(fmtMoney(item.amount))}</span></div>
+      <div class="item" data-action-menu-type="expense" data-action-menu-id="${esc(item.id)}">
+        <div class="item-row"><p class="item-title">${esc(item.category)}</p><span class="tag ${item.category === "Sale" ? "" : "warn"}">${esc(fmtMoney(item.amount))}</span>${recordActionButton("expense", item.id)}</div>
         <div class="meta"><span>${esc(fmtDate(item.date))}</span><span>${esc(goatName(item.goatId))}</span><span>${esc(item.notes || "")}</span></div>
       </div>
     `;
@@ -1070,7 +1079,13 @@
   }
 
   function bindGlobalEvents() {
+    document.addEventListener("pointerdown", handleGlobalPointerDown, { passive: true });
     document.addEventListener("pointerup", (event) => {
+      clearLongPressTimer();
+      if (Date.now() < state.longPress.suppressUntil) {
+        event.preventDefault();
+        return;
+      }
       if (event.pointerType === "mouse") return;
       const button = findActionButton(event);
       if (!button) return;
@@ -1079,7 +1094,13 @@
       state.lastPointerAction = { key, at: Date.now() };
       void handleGlobalClick(event, button);
     }, { passive: false });
+    document.addEventListener("pointercancel", clearLongPressTimer);
+    document.addEventListener("scroll", clearLongPressTimer, true);
     document.addEventListener("click", (event) => {
+      if (Date.now() < state.longPress.suppressUntil) {
+        event.preventDefault();
+        return;
+      }
       const button = findButton(event);
       if (!button || button.disabled) return;
       const key = actionKeyForButton(button);
@@ -1117,6 +1138,11 @@
       ["calendarFilter", dataset.calendarFilter],
       ["toggleTask", dataset.toggleTask],
       ["copy", dataset.copy],
+      ["recordAction", dataset.recordAction],
+      ["recordType", dataset.recordType],
+      ["recordId", dataset.recordId],
+      ["actionMenuType", dataset.actionMenuType],
+      ["actionMenuId", dataset.actionMenuId],
     ].filter(([, value]) => value);
     return parts.length ? parts.map(([name, value]) => `${name}:${value}`).join("|") : "";
   }
@@ -1125,6 +1151,27 @@
     const button = findButton(event);
     if (!button || button.disabled) return null;
     return actionKeyForButton(button) ? button : null;
+  }
+
+  function clearLongPressTimer() {
+    if (state.longPress.timer) {
+      window.clearTimeout(state.longPress.timer);
+      state.longPress.timer = null;
+    }
+  }
+
+  function handleGlobalPointerDown(event) {
+    if (event.pointerType === "mouse") return;
+    const target = event.target?.closest?.("[data-action-menu-type][data-action-menu-id]");
+    if (!target) return;
+    clearLongPressTimer();
+    const type = target.dataset.actionMenuType;
+    const id = target.dataset.actionMenuId;
+    state.longPress.timer = window.setTimeout(() => {
+      state.longPress.timer = null;
+      state.longPress.suppressUntil = Date.now() + 900;
+      openActionMenu(type, id);
+    }, 550);
   }
 
   async function handleGlobalClick(event, button) {
@@ -1153,6 +1200,7 @@
       return;
     }
     if (button.dataset.view) {
+      closeModal();
       state.view = button.dataset.view;
       render();
       return;
@@ -1160,6 +1208,14 @@
     if (button.dataset.action === "goto-sync") {
       state.view = "sync";
       render();
+      return;
+    }
+    if (button.dataset.action === "open-actions") {
+      openActionMenu(button.dataset.actionMenuType, button.dataset.actionMenuId);
+      return;
+    }
+    if (button.dataset.recordAction) {
+      await handleRecordAction(button.dataset.recordAction, button.dataset.recordType, button.dataset.recordId);
       return;
     }
     if (button.dataset.action === "load-demo") {
@@ -1281,15 +1337,15 @@
     }
   }
 
-  function openRecordForm(type, goatId = "") {
-    if (type === "goat") return openGoatForm();
-    if (type === "health") return openHealthForm(goatId);
-    if (type === "breeding") return openBreedingForm(goatId);
-    if (type === "kidding") return openKiddingForm(goatId);
-    if (type === "weight") return openWeightForm(goatId);
-    if (type === "milk") return openMilkForm(goatId);
-    if (type === "expense") return openExpenseForm(goatId);
-    if (type === "task") return openTaskForm(goatId);
+  function openRecordForm(type, goatId = "", existing = null) {
+    if (type === "goat") return openGoatForm(existing);
+    if (type === "health") return openHealthForm(goatId, existing);
+    if (type === "breeding") return openBreedingForm(goatId, existing);
+    if (type === "kidding") return openKiddingForm(goatId, existing);
+    if (type === "weight") return openWeightForm(goatId, existing);
+    if (type === "milk") return openMilkForm(goatId, existing);
+    if (type === "expense") return openExpenseForm(goatId, existing);
+    if (type === "task") return openTaskForm(goatId, existing);
   }
 
   function openGoatForm(existing = null) {
@@ -1315,10 +1371,10 @@
     });
   }
 
-  function openHealthForm(goatId = "") {
+  function openHealthForm(goatId = "", existing = null) {
     openForm({
-      title: "Add Health Record",
-      values: { goatId, type: "Deworming", date: todayIso(), nextDue: addDays(todayIso(), 90) },
+      title: existing ? "Edit Health Record" : "Add Health Record",
+      values: existing || { goatId, type: "Deworming", date: todayIso(), nextDue: addDays(todayIso(), 90) },
       fields: [
         { name: "goatId", label: "Goat", type: "select", options: goatOptions(false), required: true },
         { name: "type", label: "Type", type: "select", options: ["Vaccine", "Deworming", "Illness", "Treatment", "Vet Visit", "Other"] },
@@ -1329,16 +1385,17 @@
         { name: "notes", label: "Notes", type: "textarea" },
       ],
       onSave: async (values) => {
-        state.data.health.push({ id: uid("health"), ...values });
-        await persist({ toastText: "Health record added." });
+        if (existing) Object.assign(existing, values);
+        else state.data.health.push({ id: uid("health"), ...values });
+        await persist({ toastText: existing ? "Health record updated." : "Health record added." });
       },
     });
   }
 
-  function openBreedingForm(goatId = "") {
+  function openBreedingForm(goatId = "", existing = null) {
     openForm({
-      title: "Add Breeding Record",
-      values: { doeId: goatId, serviceDate: todayIso(), dueDate: addDays(todayIso(), 150), status: "Observed" },
+      title: existing ? "Edit Breeding Record" : "Add Breeding Record",
+      values: existing || { doeId: goatId, serviceDate: todayIso(), dueDate: addDays(todayIso(), 150), status: "Observed" },
       fields: [
         { name: "doeId", label: "Doe", type: "select", options: goatOptions(false), required: true },
         { name: "buckId", label: "Buck", type: "select", options: goatOptions(false), required: true },
@@ -1348,16 +1405,17 @@
         { name: "notes", label: "Notes", type: "textarea" },
       ],
       onSave: async (values) => {
-        state.data.breedings.push({ id: uid("breed"), ...values });
-        await persist({ toastText: "Breeding record added." });
+        if (existing) Object.assign(existing, values);
+        else state.data.breedings.push({ id: uid("breed"), ...values });
+        await persist({ toastText: existing ? "Breeding record updated." : "Breeding record added." });
       },
     });
   }
 
-  function openKiddingForm(goatId = "") {
+  function openKiddingForm(goatId = "", existing = null) {
     openForm({
-      title: "Add Kidding Record",
-      values: { doeId: goatId, date: todayIso(), kidsCount: "1" },
+      title: existing ? "Edit Kidding Record" : "Add Kidding Record",
+      values: existing || { doeId: goatId, date: todayIso(), kidsCount: "1" },
       fields: [
         { name: "doeId", label: "Doe", type: "select", options: goatOptions(false), required: true },
         { name: "date", label: "Birth date", type: "date" },
@@ -1365,16 +1423,17 @@
         { name: "notes", label: "Kids, weights, complications", type: "textarea" },
       ],
       onSave: async (values) => {
-        state.data.kiddings.push({ id: uid("kid"), ...values });
-        await persist({ toastText: "Kidding record added." });
+        if (existing) Object.assign(existing, values);
+        else state.data.kiddings.push({ id: uid("kid"), ...values });
+        await persist({ toastText: existing ? "Kidding record updated." : "Kidding record added." });
       },
     });
   }
 
-  function openWeightForm(goatId = "") {
+  function openWeightForm(goatId = "", existing = null) {
     openForm({
-      title: "Add Weight",
-      values: { goatId, date: todayIso() },
+      title: existing ? "Edit Weight" : "Add Weight",
+      values: existing || { goatId, date: todayIso() },
       fields: [
         { name: "goatId", label: "Goat", type: "select", options: goatOptions(false), required: true },
         { name: "date", label: "Date", type: "date" },
@@ -1382,16 +1441,17 @@
         { name: "notes", label: "Notes", type: "textarea" },
       ],
       onSave: async (values) => {
-        state.data.weights.push({ id: uid("weight"), ...values });
-        await persist({ toastText: "Weight added." });
+        if (existing) Object.assign(existing, values);
+        else state.data.weights.push({ id: uid("weight"), ...values });
+        await persist({ toastText: existing ? "Weight updated." : "Weight added." });
       },
     });
   }
 
-  function openMilkForm(goatId = "") {
+  function openMilkForm(goatId = "", existing = null) {
     openForm({
-      title: "Add Milk Entry",
-      values: { goatId, date: todayIso(), morning: "0", evening: "0" },
+      title: existing ? "Edit Milk Entry" : "Add Milk Entry",
+      values: existing || { goatId, date: todayIso(), morning: "0", evening: "0" },
       fields: [
         { name: "goatId", label: "Goat", type: "select", options: goatOptions(false), required: true },
         { name: "date", label: "Date", type: "date" },
@@ -1400,16 +1460,17 @@
         { name: "notes", label: "Notes", type: "textarea" },
       ],
       onSave: async (values) => {
-        state.data.milk.push({ id: uid("milk"), ...values });
-        await persist({ toastText: "Milk entry added." });
+        if (existing) Object.assign(existing, values);
+        else state.data.milk.push({ id: uid("milk"), ...values });
+        await persist({ toastText: existing ? "Milk entry updated." : "Milk entry added." });
       },
     });
   }
 
-  function openExpenseForm(goatId = "") {
+  function openExpenseForm(goatId = "", existing = null) {
     openForm({
-      title: "Add Finance Entry",
-      values: { date: todayIso(), category: "Feed", goatId },
+      title: existing ? "Edit Finance Entry" : "Add Finance Entry",
+      values: existing || { date: todayIso(), category: "Feed", goatId },
       fields: [
         { name: "date", label: "Date", type: "date" },
         { name: "category", label: "Category", type: "select", options: ["Feed", "Vet", "Medicine", "Equipment", "Labor", "Purchase", "Sale", "Transport", "Other"] },
@@ -1418,16 +1479,17 @@
         { name: "notes", label: "Notes", type: "textarea" },
       ],
       onSave: async (values) => {
-        state.data.expenses.push({ id: uid("expense"), ...values });
-        await persist({ toastText: "Finance entry added." });
+        if (existing) Object.assign(existing, values);
+        else state.data.expenses.push({ id: uid("expense"), ...values });
+        await persist({ toastText: existing ? "Finance entry updated." : "Finance entry added." });
       },
     });
   }
 
-  function openTaskForm(goatId = "") {
+  function openTaskForm(goatId = "", existing = null) {
     openForm({
-      title: "Add Task",
-      values: { dueDate: todayIso(), type: "Barn", goatId },
+      title: existing ? "Edit Task" : "Add Task",
+      values: existing || { dueDate: todayIso(), type: "Barn", goatId },
       fields: [
         { name: "title", label: "Task", required: true },
         { name: "dueDate", label: "Due date", type: "date" },
@@ -1436,10 +1498,105 @@
         { name: "notes", label: "Notes", type: "textarea" },
       ],
       onSave: async (values) => {
-        state.data.tasks.push({ id: uid("task"), done: false, ...values });
-        await persist({ toastText: "Task added." });
+        if (existing) Object.assign(existing, values);
+        else state.data.tasks.push({ id: uid("task"), done: false, ...values });
+        await persist({ toastText: existing ? "Task updated." : "Task added." });
       },
     });
+  }
+
+  function recordConfig(type) {
+    return {
+      goat: { key: "goats", form: "goat", label: "Goat", prefix: "goat" },
+      health: { key: "health", form: "health", label: "Health record", prefix: "health" },
+      breeding: { key: "breedings", form: "breeding", label: "Breeding record", prefix: "breed" },
+      kidding: { key: "kiddings", form: "kidding", label: "Kidding record", prefix: "kid" },
+      weight: { key: "weights", form: "weight", label: "Weight", prefix: "weight" },
+      milk: { key: "milk", form: "milk", label: "Milk entry", prefix: "milk" },
+      expense: { key: "expenses", form: "expense", label: "Finance entry", prefix: "expense" },
+      task: { key: "tasks", form: "task", label: "Task", prefix: "task" },
+    }[type] || null;
+  }
+
+  function findRecord(type, id) {
+    const config = recordConfig(type);
+    if (!config) return null;
+    return state.data[config.key]?.find((item) => item.id === id) || null;
+  }
+
+  function recordLabel(type, item) {
+    if (!item) return "Record";
+    if (type === "goat") return item.name || "Unnamed goat";
+    if (type === "health") return `${item.type || "Health"} - ${goatName(item.goatId)}`;
+    if (type === "breeding") return `${goatName(item.doeId)} x ${goatName(item.buckId)}`;
+    if (type === "kidding") return `Kidding - ${goatName(item.doeId)}`;
+    if (type === "weight") return `Weight - ${goatName(item.goatId)}`;
+    if (type === "milk") return `Milk - ${goatName(item.goatId)}`;
+    if (type === "expense") return item.category || "Finance entry";
+    if (type === "task") return item.title || "Task";
+    return "Record";
+  }
+
+  function openActionMenu(type, id) {
+    const config = recordConfig(type);
+    const item = findRecord(type, id);
+    if (!config || !item) {
+      toast("That item could not be found.");
+      return;
+    }
+    state.activeForm = null;
+    modalRoot.innerHTML = `
+      <div class="modal-backdrop action-backdrop" role="dialog" aria-modal="true">
+        <div class="modal action-sheet">
+          <div class="modal-header">
+            <div>
+              <p class="eyebrow" style="color: var(--muted);">${esc(config.label)}</p>
+              <h2>${esc(recordLabel(type, item))}</h2>
+            </div>
+            <button class="btn secondary icon" data-action="close-modal" type="button" aria-label="Close">X</button>
+          </div>
+          <div class="modal-body action-list">
+            <button class="action-row" data-record-action="edit" data-record-type="${esc(type)}" data-record-id="${esc(id)}" type="button">Edit</button>
+            <button class="action-row" data-record-action="duplicate" data-record-type="${esc(type)}" data-record-id="${esc(id)}" type="button">Duplicate</button>
+            <button class="action-row danger" data-record-action="delete" data-record-type="${esc(type)}" data-record-id="${esc(id)}" type="button">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  async function handleRecordAction(action, type, id) {
+    const item = findRecord(type, id);
+    const config = recordConfig(type);
+    if (!item || !config) {
+      closeModal();
+      toast("That item could not be found.");
+      return;
+    }
+    if (action === "edit") {
+      closeModal();
+      openRecordForm(config.form, "", item);
+      return;
+    }
+    if (action === "duplicate") {
+      const copy = { ...item, id: uid(config.prefix) };
+      if (type === "goat") {
+        copy.name = `${item.name || "Unnamed goat"} Copy`;
+        copy.tagId = "";
+      }
+      if (type === "task") copy.done = false;
+      state.data[config.key].push(copy);
+      closeModal();
+      await persist({ toastText: `${config.label} duplicated.` });
+      return;
+    }
+    if (action === "delete") {
+      if (!window.confirm(`Delete ${recordLabel(type, item)}? This cannot be undone.`)) return;
+      state.data[config.key] = state.data[config.key].filter((record) => record.id !== id);
+      if (type === "goat" && state.selectedGoatId === id) state.selectedGoatId = null;
+      closeModal();
+      await persist({ toastText: `${config.label} deleted.` });
+    }
   }
 
   function openForm({ title, values, fields, onSave }) {
