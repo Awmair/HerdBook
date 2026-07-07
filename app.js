@@ -16,6 +16,7 @@
     calendarSelectedDate: todayIso(),
     calendarFilter: "all",
     activeForm: null,
+    lastPointerAction: { key: "", at: 0 },
     selectedGoatId: null,
     search: "",
     drive: {
@@ -1069,9 +1070,23 @@
   }
 
   function bindGlobalEvents() {
+    document.addEventListener("pointerup", (event) => {
+      if (event.pointerType === "mouse") return;
+      const button = findActionButton(event);
+      if (!button) return;
+      const key = actionKeyForButton(button);
+      event.preventDefault();
+      state.lastPointerAction = { key, at: Date.now() };
+      void handleGlobalClick(event, button);
+    }, { passive: false });
     document.addEventListener("click", (event) => {
-      const button = event.target?.closest?.("button");
+      const button = findButton(event);
       if (!button || button.disabled) return;
+      const key = actionKeyForButton(button);
+      if (key && state.lastPointerAction.key === key && Date.now() - state.lastPointerAction.at < 900) {
+        event.preventDefault();
+        return;
+      }
       void handleGlobalClick(event, button);
     });
     document.addEventListener("input", handleGlobalInput);
@@ -1083,8 +1098,37 @@
     });
   }
 
+  function findButton(event) {
+    return event.target?.closest?.("button") || null;
+  }
+
+  function actionKeyForButton(button) {
+    const dataset = button.dataset || {};
+    const parts = [
+      ["action", dataset.action],
+      ["view", dataset.view],
+      ["form", dataset.form],
+      ["goat", dataset.goat],
+      ["selectGoat", dataset.selectGoat],
+      ["editGoat", dataset.editGoat],
+      ["recordTab", dataset.recordTab],
+      ["calendarNav", dataset.calendarNav],
+      ["calendarDate", dataset.calendarDate],
+      ["calendarFilter", dataset.calendarFilter],
+      ["toggleTask", dataset.toggleTask],
+      ["copy", dataset.copy],
+    ].filter(([, value]) => value);
+    return parts.length ? parts.map(([name, value]) => `${name}:${value}`).join("|") : "";
+  }
+
+  function findActionButton(event) {
+    const button = findButton(event);
+    if (!button || button.disabled) return null;
+    return actionKeyForButton(button) ? button : null;
+  }
+
   async function handleGlobalClick(event, button) {
-    if (button.dataset.action || button.dataset.view || button.dataset.form || button.dataset.selectGoat || button.dataset.editGoat || button.dataset.recordTab || button.dataset.calendarNav || button.dataset.calendarDate || button.dataset.calendarFilter || button.dataset.toggleTask || button.dataset.copy) {
+    if (actionKeyForButton(button)) {
       event.preventDefault();
     }
 

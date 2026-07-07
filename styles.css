@@ -691,6 +691,7 @@ button.item:active {
   color: white;
   background: var(--green-950);
   box-shadow: var(--shadow);
+  pointer-events: none;
 }
 
 .qr-box {
