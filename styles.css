@@ -51,6 +51,13 @@ textarea {
   font: inherit;
 }
 
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(15, 47, 41, 0.14);
+}
+
 button {
   border: 0;
 }
