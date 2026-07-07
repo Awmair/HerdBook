@@ -18,7 +18,6 @@
     activeForm: null,
     lastPointerAction: { key: "", at: 0 },
     longPress: { timer: null, suppressUntil: 0 },
-    lastNavAction: { view: "", at: 0 },
     selectedGoatId: null,
     search: "",
     drive: {
@@ -450,7 +449,7 @@
         ${items
           .map(
             ([id, label]) =>
-              `<button type="button" class="${state.view === id ? "active" : ""}" data-view="${id}"><span class="nav-icon">${navIcon(id)}</span><span>${esc(label)}</span></button>`
+              `<a href="#view/${id}" class="${state.view === id ? "active" : ""}" data-view="${id}"><span class="nav-icon">${navIcon(id)}</span><span>${esc(label)}</span></a>`
           )
           .join("")}
       </nav>
@@ -839,17 +838,30 @@
     `;
   }
 
+  function goatPhoto(goat, variant = "thumb") {
+    const src = goat?.photoData;
+    const label = esc(goat?.name || "Goat");
+    if (src) {
+      return `<img class="goat-photo ${variant}" src="${esc(src)}" alt="${label}" loading="lazy" />`;
+    }
+    const initial = esc((goat?.name || "G").trim().slice(0, 1).toUpperCase() || "G");
+    return `<div class="goat-photo placeholder ${variant}" aria-label="${label}">${initial}</div>`;
+  }
+
   function renderGoatItem(goat) {
     return `
-      <button class="item" data-select-goat="${esc(goat.id)}" data-action-menu-type="goat" data-action-menu-id="${esc(goat.id)}" type="button">
-        <div class="item-row">
-          <p class="item-title">${esc(goat.name || "Unnamed goat")}</p>
-          <span class="tag">${esc(goat.tagId || "No tag")}</span>
-        </div>
-        <div class="meta">
-          <span>${esc(goat.sex || "Unknown")}</span>
-          <span>${esc(goat.breed || "No breed")}</span>
-          <span>${esc(goat.status || "Active")}</span>
+      <button class="item goat-item" data-select-goat="${esc(goat.id)}" data-action-menu-type="goat" data-action-menu-id="${esc(goat.id)}" type="button">
+        ${goatPhoto(goat, "thumb")}
+        <div class="item-main">
+          <div class="item-row">
+            <p class="item-title">${esc(goat.name || "Unnamed goat")}</p>
+            <span class="tag">${esc(goat.tagId || "No tag")}</span>
+          </div>
+          <div class="meta">
+            <span>${esc(goat.sex || "Unknown")}</span>
+            <span>${esc(goat.breed || "No breed")}</span>
+            <span>${esc(goat.status || "Active")}</span>
+          </div>
         </div>
       </button>
     `;
@@ -864,7 +876,8 @@
     ].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     return `
       <section class="panel">
-        <div class="toolbar">
+        <div class="goat-profile-head">
+          ${goatPhoto(goat, "hero")}
           <div>
             <p class="eyebrow" style="color: var(--muted);">${esc(goat.tagId || "No tag")}</p>
             <h2>${esc(goat.name || "Unnamed goat")}</h2>
@@ -1105,8 +1118,8 @@
   }
 
   function bindGlobalEvents() {
-    document.addEventListener("pointerdown", handleNavPointerDown, { capture: true, passive: false });
-    document.addEventListener("click", handleNavClick, true);
+    document.addEventListener("pointerdown", handleNavPointerDown, { capture: true, passive: true });
+    document.addEventListener("click", handleNavRouteClick, true);
     document.addEventListener("pointerdown", handleGlobalPointerDown, { passive: true });
     document.addEventListener("pointerup", (event) => {
       clearLongPressTimer();
@@ -1151,36 +1164,37 @@
     return event.target?.closest?.("button") || null;
   }
 
-  function findNavButton(event) {
-    return event.target?.closest?.(".bottom-nav button[data-view]") || null;
+  function findNavLink(event) {
+    return event.target?.closest?.(".bottom-nav a[data-view]") || null;
   }
 
-  function navigateToView(view) {
+  function resetInteractionLocks() {
     clearLongPressTimer();
     state.longPress.suppressUntil = 0;
-    state.lastNavAction = { view, at: Date.now() };
-    closeModal();
-    state.view = view;
-    render();
+    state.lastPointerAction = { key: "", at: 0 };
   }
 
   function handleNavPointerDown(event) {
-    const button = findNavButton(event);
-    if (!button || button.disabled) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation?.();
-    navigateToView(button.dataset.view);
+    if (findNavLink(event)) resetInteractionLocks();
   }
 
-  function handleNavClick(event) {
-    const button = findNavButton(event);
-    if (!button || button.disabled) return;
+  function handleNavRouteClick(event) {
+    const link = findNavLink(event);
+    if (!link) return;
     event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation?.();
-    if (state.lastNavAction.view === button.dataset.view && Date.now() - state.lastNavAction.at < 900) return;
-    navigateToView(button.dataset.view);
+    resetInteractionLocks();
+    navigateToView(link.dataset.view);
+  }
+
+  function navigateToView(view) {
+    resetInteractionLocks();
+    const nextHash = `#view/${view}`;
+    if (window.location.hash !== nextHash) {
+      window.location.hash = nextHash;
+    }
+    closeModal();
+    state.view = view;
+    render();
   }
 
   function actionKeyForButton(button) {
@@ -1387,9 +1401,12 @@
       event.preventDefault();
       const form = new FormData(event.target);
       const next = {};
-      state.activeForm.fields.forEach((field) => {
-        next[field.name] = normalizeDate(form.get(field.name));
-      });
+      for (const field of state.activeForm.fields) {
+        const value = field.type === "photo"
+          ? await readPhotoField(form, field.name, state.activeForm.values?.[field.name] || "")
+          : normalizeDate(form.get(field.name));
+        if (value !== undefined) next[field.name] = value;
+      }
       const onSave = state.activeForm.onSave;
       closeModal();
       await onSave(next);
@@ -1414,6 +1431,7 @@
       fields: [
         { name: "name", label: "Name", required: true },
         { name: "tagId", label: "Tag ID" },
+        { name: "photoData", label: "Photo", type: "photo" },
         { name: "sex", label: "Sex", type: "select", options: ["Doe", "Buck", "Kid", "Wether", "Unknown"] },
         { name: "breed", label: "Breed" },
         { name: "dob", label: "Date of birth", type: "date" },
@@ -1659,7 +1677,7 @@
   }
 
   function openForm({ title, values, fields, onSave }) {
-    state.activeForm = { fields, onSave };
+    state.activeForm = { fields, onSave, values };
     modalRoot.innerHTML = `
       <div class="modal-backdrop" role="dialog" aria-modal="true">
         <form class="modal" id="record-form">
@@ -1681,8 +1699,51 @@
     `;
   }
 
+  function readPhotoField(form, name, currentValue = "") {
+    if (form.get(`${name}__remove`) === "1") return Promise.resolve("");
+    const file = form.get(name);
+    if (!file || !file.size) return Promise.resolve(undefined);
+    return imageFileToDataUrl(file).catch((error) => {
+      console.warn("Photo processing failed", error);
+      toast("Could not process that photo.");
+      return currentValue || undefined;
+    });
+  }
+
+  function imageFileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("Could not read photo."));
+      reader.onload = () => {
+        const image = new Image();
+        image.onerror = () => reject(new Error("Could not load photo."));
+        image.onload = () => {
+          const max = 900;
+          const scale = Math.min(1, max / Math.max(image.width, image.height));
+          const width = Math.max(1, Math.round(image.width * scale));
+          const height = Math.max(1, Math.round(image.height * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const context = canvas.getContext("2d");
+          context.drawImage(image, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", 0.82));
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   function renderField(field, value = "") {
     const required = field.required ? "required" : "";
+    if (field.type === "photo") {
+      return `<div class="field photo-field"><label>${esc(field.label)}</label>
+        ${value ? `<img class="photo-preview" src="${esc(value)}" alt="Current goat photo" />` : `<div class="photo-empty">No photo yet</div>`}
+        <input name="${esc(field.name)}" type="file" accept="image/*" capture="environment" />
+        ${value ? `<label class="check-row"><input type="checkbox" name="${esc(field.name)}__remove" value="1" /> Remove photo</label>` : ""}
+      </div>`;
+    }
     if (field.type === "textarea") {
       return `<div class="field"><label>${esc(field.label)}</label><textarea name="${esc(field.name)}" ${required}>${esc(value)}</textarea></div>`;
     }
@@ -2267,6 +2328,14 @@
 
   function parseRoute() {
     const hash = window.location.hash.replace(/^#\/?/, "");
+    if (hash.startsWith("view/")) {
+      const view = hash.slice(5);
+      if (["dashboard", "calendar", "herd", "records", "finance", "sync"].includes(view)) {
+        closeModal();
+        state.view = view;
+        return;
+      }
+    }
     if (hash.startsWith("goat/")) {
       let goatId = "";
       try {

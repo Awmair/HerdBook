@@ -584,6 +584,7 @@ button.item:active {
   backdrop-filter: blur(18px);
 }
 
+.bottom-nav a,
 .bottom-nav button {
   display: grid;
   gap: 3px;
@@ -595,8 +596,10 @@ button.item:active {
   font-size: 10px;
   font-weight: 800;
   cursor: pointer;
+  text-decoration: none;
 }
 
+.bottom-nav a.active,
 .bottom-nav button.active {
   color: var(--green-950);
   background: var(--sage-200);
@@ -625,18 +628,92 @@ button.item:active {
   stroke: none;
 }
 
+.bottom-nav a.active .nav-icon,
 .bottom-nav button.active .nav-icon {
   color: white;
   background: var(--green-800);
 }
 
+.bottom-nav a.active .nav-accent,
 .bottom-nav button.active .nav-accent {
   fill: var(--brass-2);
   opacity: 1;
 }
 
+.bottom-nav a:active .nav-icon,
 .bottom-nav button:active .nav-icon {
   transform: translateY(1px);
+}
+
+.goat-item {
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+}
+
+.item-main {
+  min-width: 0;
+}
+
+.goat-profile-head {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.goat-photo {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  color: var(--green-950);
+  background: var(--sage-200);
+  font-weight: 900;
+  object-fit: cover;
+}
+
+.goat-photo.thumb {
+  width: 46px;
+  height: 46px;
+  font-size: 18px;
+}
+
+.goat-photo.hero {
+  width: 72px;
+  height: 72px;
+  font-size: 28px;
+}
+
+.photo-field {
+  gap: 8px;
+}
+
+.photo-preview,
+.photo-empty {
+  width: 100%;
+  max-height: 220px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  object-fit: cover;
+  background: var(--surface);
+}
+
+.photo-empty {
+  display: grid;
+  min-height: 96px;
+  place-items: center;
+  color: var(--muted);
+}
+
+.check-row {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .modal-backdrop {
@@ -914,6 +991,23 @@ button.item:active {
 .desktop-layout {
   display: grid;
   gap: 14px;
+}
+
+@media (max-width: 420px) {
+  .goat-profile-head {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .goat-profile-head .toolbar.compact {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .goat-photo.hero {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+  }
 }
 
 @media (min-width: 760px) {
