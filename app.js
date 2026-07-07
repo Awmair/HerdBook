@@ -18,6 +18,7 @@
     activeForm: null,
     lastPointerAction: { key: "", at: 0 },
     longPress: { timer: null, suppressUntil: 0 },
+    lastNavAction: { view: "", at: 0 },
     selectedGoatId: null,
     search: "",
     drive: {
@@ -1104,6 +1105,8 @@
   }
 
   function bindGlobalEvents() {
+    document.addEventListener("pointerdown", handleNavPointerDown, { capture: true, passive: false });
+    document.addEventListener("click", handleNavClick, true);
     document.addEventListener("pointerdown", handleGlobalPointerDown, { passive: true });
     document.addEventListener("pointerup", (event) => {
       clearLongPressTimer();
@@ -1148,6 +1151,38 @@
     return event.target?.closest?.("button") || null;
   }
 
+  function findNavButton(event) {
+    return event.target?.closest?.(".bottom-nav button[data-view]") || null;
+  }
+
+  function navigateToView(view) {
+    clearLongPressTimer();
+    state.longPress.suppressUntil = 0;
+    state.lastNavAction = { view, at: Date.now() };
+    closeModal();
+    state.view = view;
+    render();
+  }
+
+  function handleNavPointerDown(event) {
+    const button = findNavButton(event);
+    if (!button || button.disabled) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+    navigateToView(button.dataset.view);
+  }
+
+  function handleNavClick(event) {
+    const button = findNavButton(event);
+    if (!button || button.disabled) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+    if (state.lastNavAction.view === button.dataset.view && Date.now() - state.lastNavAction.at < 900) return;
+    navigateToView(button.dataset.view);
+  }
+
   function actionKeyForButton(button) {
     const dataset = button.dataset || {};
     const parts = [
@@ -1187,6 +1222,8 @@
 
   function handleGlobalPointerDown(event) {
     if (event.pointerType === "mouse") return;
+    const commandButton = findButton(event);
+    if (commandButton && commandButton.dataset.actionMenuType && commandButton.dataset.action === "open-actions") return;
     const target = event.target?.closest?.("[data-action-menu-type][data-action-menu-id]");
     if (!target) return;
     clearLongPressTimer();
@@ -1225,14 +1262,11 @@
       return;
     }
     if (button.dataset.view) {
-      closeModal();
-      state.view = button.dataset.view;
-      render();
+      navigateToView(button.dataset.view);
       return;
     }
     if (button.dataset.action === "goto-sync") {
-      state.view = "sync";
-      render();
+      navigateToView("sync");
       return;
     }
     if (button.dataset.action === "open-actions") {
@@ -1663,6 +1697,7 @@
   }
 
   function closeModal() {
+    clearLongPressTimer();
     state.activeForm = null;
     modalRoot.innerHTML = "";
   }
