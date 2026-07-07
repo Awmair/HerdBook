@@ -1,4 +1,4 @@
-const CACHE_NAME = "herdbook-v10";
+const CACHE_NAME = "herdbook-v11";
 const APP_ASSETS = [
   "./",
   "./index.html",

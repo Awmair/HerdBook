@@ -657,6 +657,8 @@
           date: task.dueDate,
           title: task.title || "Task",
           meta: `${task.type || "Task"}${task.goatId ? ` - ${goatName(task.goatId)}` : ""}`,
+          sourceType: "task",
+          sourceId: task.id,
         })
       );
     state.data.health
@@ -667,6 +669,8 @@
           date: item.nextDue,
           title: `${item.type || "Health"} due`,
           meta: `${goatName(item.goatId)}${item.medicine ? ` - ${item.medicine}` : ""}`,
+          sourceType: "health",
+          sourceId: item.id,
         })
       );
     state.data.breedings.forEach((item) => {
@@ -676,6 +680,8 @@
           date: item.serviceDate,
           title: "Breeding",
           meta: `${goatName(item.doeId)} x ${goatName(item.buckId)}`,
+          sourceType: "breeding",
+          sourceId: item.id,
         });
       }
       if (item.dueDate && item.status !== "Kidded") {
@@ -684,6 +690,8 @@
           date: item.dueDate,
           title: "Expected kidding",
           meta: `${goatName(item.doeId)} bred to ${goatName(item.buckId)}`,
+          sourceType: "breeding",
+          sourceId: item.id,
         });
       }
     });
@@ -695,6 +703,8 @@
           date: item.date,
           title: "Kidding recorded",
           meta: `${goatName(item.doeId)} - ${item.kidsCount || 0} kids`,
+          sourceType: "kidding",
+          sourceId: item.id,
         })
       );
     return events.sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
@@ -706,11 +716,13 @@
   }
 
   function renderCalendarEventItem(event) {
+    const action = event.sourceType && event.sourceId ? recordActionButton(event.sourceType, event.sourceId) : "";
     return `
-      <div class="item calendar-event">
+      <div class="item calendar-event" ${actionMenuAttrs(event.sourceType, event.sourceId)}>
         <div class="item-row">
           <p class="item-title">${esc(event.title)}</p>
           <span class="tag ${event.kind === "health" || event.kind === "kidding" ? "warn" : "neutral"}">${esc(fmtDate(event.date))}</span>
+          ${action}
         </div>
         <div class="meta"><span class="event-kind ${esc(event.kind)}">${esc(event.kind)}</span><span>${esc(event.meta || "")}</span></div>
       </div>
@@ -738,22 +750,27 @@
         date: item.nextDue,
         meta: item.medicine || "Health",
         kind: "health",
+        sourceType: "health",
+        sourceId: item.id,
       })),
       ...tasks.map((task) => ({
         title: task.title,
         date: task.dueDate,
         meta: `${task.type || "Task"}${task.goatId ? ` - ${goatName(task.goatId)}` : ""}`,
         kind: "task",
+        sourceType: "task",
+        sourceId: task.id,
       })),
     ].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
     if (!items.length) return empty("Nothing due in the next two weeks.");
     return `<div class="list">${items
       .map(
         (item) => `
-          <div class="item">
+          <div class="item" ${actionMenuAttrs(item.sourceType, item.sourceId)}>
             <div class="item-row">
               <p class="item-title">${esc(item.title)}</p>
               <span class="tag ${item.kind === "health" ? "warn" : "neutral"}">${esc(fmtDate(item.date))}</span>
+              ${recordActionButton(item.sourceType, item.sourceId)}
             </div>
             <div class="meta"><span>${esc(item.meta)}</span></div>
           </div>
@@ -767,10 +784,11 @@
     return `<div class="list">${items
       .map(
         (item) => `
-          <div class="item">
+          <div class="item" ${actionMenuAttrs("breeding", item.id)}>
             <div class="item-row">
               <p class="item-title">${esc(goatName(item.doeId))}</p>
               <span class="tag warn">${esc(fmtDate(item.dueDate))}</span>
+              ${recordActionButton("breeding", item.id)}
             </div>
             <div class="meta"><span>Bred to ${esc(goatName(item.buckId))}</span><span>${esc(item.status)}</span></div>
           </div>
@@ -838,10 +856,10 @@
 
   function renderGoatProfile(goat) {
     const events = [
-      ...state.data.health.filter((item) => item.goatId === goat.id).map((item) => ({ date: item.date, title: item.type, meta: item.medicine || "Health" })),
-      ...state.data.breedings.filter((item) => item.doeId === goat.id || item.buckId === goat.id).map((item) => ({ date: item.serviceDate, title: "Breeding", meta: item.status })),
-      ...state.data.weights.filter((item) => item.goatId === goat.id).map((item) => ({ date: item.date, title: "Weight", meta: `${item.weight} ${state.data.settings.weightUnit}` })),
-      ...state.data.milk.filter((item) => item.goatId === goat.id).map((item) => ({ date: item.date, title: "Milk", meta: `${milkTotal(item)} ${state.data.settings.milkUnit}` })),
+      ...state.data.health.filter((item) => item.goatId === goat.id).map((item) => ({ date: item.date, title: item.type, meta: item.medicine || "Health", sourceType: "health", sourceId: item.id })),
+      ...state.data.breedings.filter((item) => item.doeId === goat.id || item.buckId === goat.id).map((item) => ({ date: item.serviceDate, title: "Breeding", meta: item.status, sourceType: "breeding", sourceId: item.id })),
+      ...state.data.weights.filter((item) => item.goatId === goat.id).map((item) => ({ date: item.date, title: "Weight", meta: `${item.weight} ${state.data.settings.weightUnit}`, sourceType: "weight", sourceId: item.id })),
+      ...state.data.milk.filter((item) => item.goatId === goat.id).map((item) => ({ date: item.date, title: "Milk", meta: `${milkTotal(item)} ${state.data.settings.milkUnit}`, sourceType: "milk", sourceId: item.id })),
     ].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     return `
       <section class="panel">
@@ -876,11 +894,13 @@
   }
 
   function renderTimelineItem(item) {
+    const action = item.sourceType && item.sourceId ? recordActionButton(item.sourceType, item.sourceId) : "";
     return `
-      <div class="item">
+      <div class="item" ${actionMenuAttrs(item.sourceType, item.sourceId)}>
         <div class="item-row">
           <p class="item-title">${esc(item.title)}</p>
           <span class="tag neutral">${esc(fmtDate(item.date))}</span>
+          ${action}
         </div>
         <div class="meta"><span>${esc(item.meta || "")}</span></div>
       </div>
@@ -998,7 +1018,12 @@
     `;
   }
 
+  function actionMenuAttrs(type, id) {
+    return type && id ? `data-action-menu-type="${esc(type)}" data-action-menu-id="${esc(id)}"` : "";
+  }
+
   function recordActionButton(type, id) {
+    if (!type || !id) return "";
     return `<button class="btn small secondary item-action" data-action="open-actions" data-action-menu-type="${esc(type)}" data-action-menu-id="${esc(id)}" type="button" aria-label="Record actions">More</button>`;
   }
 
