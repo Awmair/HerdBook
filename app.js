@@ -1788,12 +1788,14 @@
   }
 
   function waitForGoogle() {
+    if (window.google?.accounts?.oauth2) return Promise.resolve();
     return new Promise((resolve, reject) => {
       const started = Date.now();
       const timer = window.setInterval(() => {
         if (window.google?.accounts?.oauth2) {
           window.clearInterval(timer);
           resolve();
+          return;
         }
         if (Date.now() - started > 8000) {
           window.clearInterval(timer);
@@ -1806,17 +1808,36 @@
   async function requestGoogleToken(prompt = "consent") {
     await waitForGoogle();
     return new Promise((resolve, reject) => {
-      const client = google.accounts.oauth2.initTokenClient({
-        client_id: CONFIG.googleClientId,
-        scope: DRIVE_SCOPE,
-        prompt,
-        callback: (response) => {
-          if (response.error) reject(new Error(response.error));
-          else if (response.access_token) resolve(response.access_token);
-          else reject(new Error("Google sign-in did not return access."));
-        },
-      });
-      client.requestAccessToken();
+      let settled = false;
+      const finish = (callback) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        callback();
+      };
+      const timeout = window.setTimeout(() => {
+        finish(() => reject(new Error("Google sign-in timed out. Try again.")));
+      }, 60000);
+
+      try {
+        const client = google.accounts.oauth2.initTokenClient({
+          client_id: CONFIG.googleClientId,
+          scope: DRIVE_SCOPE,
+          prompt,
+          callback: (response) => {
+            if (response.error) {
+              finish(() => reject(new Error(response.error)));
+            } else if (response.access_token) {
+              finish(() => resolve(response.access_token));
+            } else {
+              finish(() => reject(new Error("Google sign-in did not return access.")));
+            }
+          },
+        });
+        client.requestAccessToken();
+      } catch (error) {
+        finish(() => reject(error));
+      }
     });
   }
 

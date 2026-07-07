@@ -1,4 +1,4 @@
-const CACHE_NAME = "herdbook-v8";
+const CACHE_NAME = "herdbook-v9";
 const APP_ASSETS = [
   "./",
   "./index.html",
@@ -11,6 +11,15 @@ const APP_ASSETS = [
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"
 ];
+const APP_ASSET_PATHS = new Set(APP_ASSETS.map((asset) => new URL(asset, self.location.href).pathname));
+
+function cacheUrlForRequest(request) {
+  const url = new URL(request.url);
+  if (url.origin !== location.origin) return "";
+  url.search = "";
+  url.hash = "";
+  return APP_ASSET_PATHS.has(url.pathname) ? url.href : "";
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_ASSETS)));
@@ -28,18 +37,18 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
-  const url = new URL(event.request.url);
-  if (url.origin !== location.origin) return;
+  const cacheUrl = cacheUrlForRequest(event.request);
+  if (!cacheUrl) return;
 
   event.respondWith(
     fetch(event.request)
       .then((response) => {
         if (response.ok) {
           const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          caches.open(CACHE_NAME).then((cache) => cache.put(cacheUrl, copy));
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(cacheUrl))
   );
 });
